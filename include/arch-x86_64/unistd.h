@@ -707,4 +707,16 @@ __SYSCALL(__NR_lwk_ifconfig, sys_lwk_ifconfig)
 __SYSCALL(__NR_lwk_ifconfig, syscall_not_implemented)
 #endif
 
+#define __NR_aspace_set_region       525
+__SYSCALL(__NR_aspace_set_region, sys_aspace_set_region)
+
+#define __NR_aspace_sync_region       526
+__SYSCALL(__NR_aspace_sync_region, sys_aspace_sync_region)
+
+#define __NR_aspace_copy      527
+__SYSCALL(__NR_aspace_copy, sys_aspace_copy)
+
+#define __NR_kernel_query      528
+__SYSCALL(__NR_kernel_query, sys_kernel_query)
+
 #endif

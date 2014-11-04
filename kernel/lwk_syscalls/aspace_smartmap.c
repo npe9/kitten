@@ -8,8 +8,9 @@ sys_aspace_smartmap(
 	size_t     extent
 )
 {
-	if (current->uid != 0)
-		return -EPERM;
+//	printk(KERN_DEBUG "smartmap uid %d", current->uid);
+//	if (current->uid != 0)
+//		return -EPERM;
 
 	if ((src < UASPACE_MIN_ID) || (src > UASPACE_MAX_ID))
 		return -EINVAL;

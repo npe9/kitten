@@ -32,6 +32,8 @@
 #define VM_KERNEL		(1 << 7)
 #define VM_HEAP			(1 << 8)
 #define VM_SMARTMAP		(1 << 9)
+// XXX: is there any reason to make these match the linux side?
+#define VM_COW		(1 << 10)
 typedef unsigned long vmflags_t;
 
 
@@ -41,6 +43,27 @@ typedef unsigned long vmflags_t;
 #define VM_PAGE_2MB		(1 << 21)
 #define VM_PAGE_1GB		(1 << 30)
 typedef unsigned long vmpagesize_t;
+
+// Structures shared between kernel and user-space.
+struct user_region {
+	vaddr_t start;
+	vaddr_t end;
+	char name[32];
+
+};
+
+struct user_aspace {
+	id_t id;
+	char name[32];
+	int refcnt;
+	int count;
+	struct user_region *regions;
+};
+
+struct user_tree {
+	int count;
+	struct user_aspace aspaces[];
+};
 
 
 // Begin core address space management API.
@@ -170,6 +193,12 @@ aspace_map_region_anywhere(
 #include <arch/aspace.h>
 
 
+struct aspace_operations_struct {
+	int (*new_page)(struct aspace *, vmpagesize_t, paddr_t*);
+	void (*free)(void*);
+};
+
+
 // Address space structure
 //
 // This structure represents the kernel's view of an address space,
@@ -233,8 +262,11 @@ struct aspace {
 
 	// Architecture specific address space data.
 	struct arch_aspace	arch;
-};
 
+	struct aspace_operations_struct *as_ops;
+	void *as_private_data;
+
+};
 
 // Begin kernel-only "unlocked" versions of the core aspace management API.
 // 
@@ -396,6 +428,19 @@ arch_aspace_map_pmem_into_kernel(
 	paddr_t			start,
 	paddr_t			end
 );
+
+extern int
+arch_aspace_copy(
+		struct aspace *		src,
+		struct aspace *		dst
+);
+
+extern int
+aspace_enum(
+		char **buf,
+		int *len
+);
+
 
 // End architecture specific address space functions
 

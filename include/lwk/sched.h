@@ -19,6 +19,7 @@ extern void sched_del_task(struct task_struct *task);
 extern int sched_wakeup_task(struct task_struct *task,
                              taskstate_t valid_states);
 extern void schedule(void); 
+extern int task_enum(void *old, int len);
 
 #define MAX_SCHEDULE_TIMEOUT TIME_T_MAX
 extern ktime_t schedule_timeout(ktime_t timeout);

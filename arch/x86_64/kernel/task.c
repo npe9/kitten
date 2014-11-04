@@ -56,6 +56,14 @@ arch_task_create(
 	if (is_clone)
 		do_arch_prctl(task, ARCH_SET_FS, parent_regs->r8);
 
+
+	if (start_state->fs)
+		do_arch_prctl(task, ARCH_SET_FS, start_state->fs);
+//		asm("movl %k0,%%fs" :: "r" (start_state->fs) :);
+//
+//	asm volatile("movl %%fs,%k0" :"=r" (v) ::);
+//	printk(KERN_DEBUG "fs is %x\n", v);
+
 	/* Initialize register state */
 	if (start_state->aspace_id == KERNEL_ASPACE_ID) {
 		regs->ss     = __KERNEL_DS;

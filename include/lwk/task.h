@@ -25,7 +25,7 @@ typedef struct {
 
 	vaddr_t			stack_ptr;	// Ignored for kernel tasks
 	vaddr_t			entry_point;	// Instruction address to start executing at
-
+	vaddr_t			fs;		// fs register value, for thread local storage
 	int			use_args;	// If true, pass args to entry_point()
 	uintptr_t		arg[4];		// Args to pass to entry_point()
 } start_state_t;

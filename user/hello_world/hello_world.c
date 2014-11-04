@@ -19,7 +19,7 @@
 #include <utmpx.h>
 #include <unistd.h>
 #include <sys/syscall.h>
-
+#include <lwk/task.h>
 static int pmem_api_test(void);
 static int aspace_api_test(void);
 static int task_api_test(void);
@@ -27,6 +27,8 @@ static int task_migrate_test(void);
 static int fd_test(void);
 static int socket_api_test(void);
 static int hypervisor_api_test(void);
+static int cow_api_test(void);
+static int tcasm_api_test(void);
 
 int
 main(int argc, char *argv[], char *envp[])
@@ -45,12 +47,13 @@ main(int argc, char *argv[], char *envp[])
 
 	pmem_api_test();
 	aspace_api_test();
+	tcasm_api_test();
+    cow_api_test();
 	fd_test();
 	task_api_test();
 	task_migrate_test();
 	hypervisor_api_test();
         socket_api_test();
-
 	printf("\n");
 	printf("ALL TESTS COMPLETE\n");
 
@@ -141,7 +144,7 @@ aspace_api_test(void)
 		return -1;
 	}
 
-	aspace_dump2console(new_id);
+//	aspace_dump2console(new_id);
 
 	printf("  Unmapping myself from aspace %u\n", new_id);
 	status = aspace_unsmartmap(my_id, new_id);
@@ -150,7 +153,7 @@ aspace_api_test(void)
 		return -1;
 	}
 
-	aspace_dump2console(new_id);
+//	aspace_dump2console(new_id);
 
 	printf("  Destroying a aspace %u: ", new_id);
 	status = aspace_destroy(new_id);
@@ -160,6 +163,10 @@ aspace_api_test(void)
 	}
 	printf("OK\n");
 
+	struct user_tree *t;
+	char *buf;
+	buf = malloc(8192);
+
 	printf("  Using SMARTMAP to do a self-mapping\n");
 	status = aspace_smartmap(my_id, my_id, SMARTMAP_ALIGN, SMARTMAP_ALIGN);
 	if (status) {
@@ -167,7 +174,14 @@ aspace_api_test(void)
 		return -1;
 	}
 
-	aspace_dump2console(my_id);
+	aspace_get(buf, 8192);
+	t = (struct user_tree*)buf;
+//	int i;
+//	for(i = 0; i < t->count; i++){
+//		aspace_dump2console(t->aspaces[i].id);
+//	}
+
+//	aspace_dump2console(my_id);
 
 	printf("  Unmapping my self-mapping\n");
 	status = aspace_unsmartmap(my_id, my_id);
@@ -176,8 +190,33 @@ aspace_api_test(void)
 		return -1;
 	}
 
-	aspace_dump2console(my_id);
 
+
+	printf("  Copying an aspace %u to %u\n", my_id, new_id);
+	status = aspace_copy(my_id, &new_id, 0);
+//	printf("finished aspace copy new_id %d %d\n", new_id, status);
+	if (status) {
+		printf("ERROR: aspace_copy() status=%d\n", status);
+		return -1;
+	}
+
+//	printf("original aspace %d\n", my_id);
+//	aspace_dump2console(my_id);
+//	printf("copied aspace %d\n", new_id);
+//	aspace_dump2console(new_id);
+
+
+//	printf("malloced buf %p\n", buf);
+//	printf("Counting aspaces\n");
+	aspace_get(buf, 8192);
+	t = (struct user_tree*)buf;
+//	for(i = 0; i < t->count; i++){
+//		aspace_dump2console(t->aspaces[i].id);
+//	}
+//
+//	printf("ASPACE got t %p\n", t);
+//	printf("ASPACE count %d\n", t->count);
+//	free(buf);
 	printf("TEST END:   Address Space Management\n");
 	return 0;
 }
@@ -625,5 +664,277 @@ hypervisor_api_test(void)
 	printf("    Success.\n");
 
 	printf("TEST END:   Hypervisor API\n");
+	return 0;
+}
+
+// TODO(npe): make this a command line option
+int len = 2048;
+#define ITERS 10
+volatile id_t shared_id;
+
+static int
+tcasm_observer(void *v)
+{
+	id_t my_id, cur_id;
+	int i;
+	int status;
+	char *buf;
+	int offset;
+	double res;
+
+	offset = v;
+
+	aspace_get_myid(&my_id);
+	cur_id = shared_id;
+	printf("OBSERVER: hello world! offset %llx\n", offset);
+	// so this works, it needs to be able to get the values  it needs
+	for(;;) {
+		while(cur_id == shared_id)
+			;
+		printf("new id %d old id %d\n", shared_id, cur_id);
+		aspace_destroy(cur_id);
+		cur_id = shared_id;
+		//aspace_dump2console(my_id);
+
+		status = aspace_smartmap(cur_id, my_id, SMARTMAP_ALIGN, SMARTMAP_ALIGN);
+		//aspace_dump2console(my_id);
+
+		if(status != 0) {
+			printf("couldn't smartmap into tcasm observer status %d\n", status);
+			exit(status);
+		}
+		buf = (char*)(SMARTMAP_ALIGN+offset);
+		res = 0.0;
+		for(i = 0; i < len; i++){
+			// need to remember what I was doing in compbench.
+
+		}
+		status = aspace_unsmartmap(cur_id, my_id);
+		if(status != 0) {
+			printf("couldn't unsmartmap into tcasm observer status %d\n", status);
+			exit(status);
+		}
+		// where does the smartmap exist?
+
+		// mount the space into the address space.
+	}
+
+
+	exit(0);
+}
+
+
+static int
+tcasm_api_test(void)
+{
+	int i, j, k, l, nflop, status;
+	id_t id, new_id, tid;
+	struct pmem_region rgn;
+	vaddr_t stack;
+	char *buf;
+	struct timeval start, end, total;
+	double cp_start, cp_end;
+	double set_start, set_end;
+	double iter_start, iter_end;
+	double sets[ITERS], cps[ITERS], iters[ITERS];
+	vaddr_t region;
+	int my_aspace;
+	double cp_avg, set_avg;
+
+	int pagesz = VM_PAGE_4KB;
+	int npages = 2048*2;
+	int nbacking = 2048*2;
+
+	// TODO(npe): allow the user to state how much should be benchmarked.
+	nflop = 1;
+	id = 1;
+	printf("\n");
+	printf("TEST BEGIN: TCASM API\n");
+	// need to make an observer
+	// need to test the producer.
+	// need this to be apples to apples.
+
+	start_state_t s;
+	if((status = aspace_copy(id, &new_id, 0))) {
+		printf("couldn't copy aspace %d", status);
+		return -1;
+	}
+	printf("aspace copied new_id %d\n", new_id);
+	s.aspace_id = new_id;
+//	s.aspace_id = id;
+	// how to select a cpu?
+	// that is a good question?
+	// this is where I want to know what is running on every cpu.
+	s.cpu_id = 1;
+	s.entry_point = (long int)tcasm_observer;
+	// this is interesting, I need to dump and figure out what the kernel is up to.
+	s.group_id = 0;
+	if((status = pmem_alloc_umem(8*VM_PAGE_2MB, VM_PAGE_2MB, &rgn))){
+		return -1;
+		// error handling.
+	}
+	printf("before stack\n");
+//	aspace_dump2console(id);
+	printf("rgn size %d %p %p %d\n", rgn.size, rgn.start, rgn.end, rgn.end - rgn.start);
+	if((status = aspace_map_region_anywhere(id, &stack, rgn.end - rgn.start, VM_WRITE|VM_READ|VM_USER, VM_PAGE_2MB, "new-stack", rgn.start))) {
+		printf("couldn't map region %d\n", status);
+		return -1;
+	}
+	printf("after stack\n");
+//	aspace_dump2console(id);
+	printf("stack %x stack+VM_PAGE_2MB %x\n", stack, stack+VM_PAGE_2MB);
+	s.fs = stack+VM_PAGE_2MB;
+	s.stack_ptr = stack+2*VM_PAGE_2MB;
+	// TODO: Get this working?
+	s.task_id = ANY_ID;
+	snprintf(s.task_name,32,"tcasm observer");
+	s.use_args = 1;
+	aspace_get_myid(&my_aspace);
+	if((status = pmem_alloc_umem(1000*VM_PAGE_4KB, VM_PAGE_4KB, &rgn))){
+                return -1;
+                // error handling.
+        }
+	printf("backed rgn size %d %p %p %d\n", rgn.size, rgn.start, rgn.end, rgn.end - rgn.start);
+//	pmem_dump2console();
+	status = arena_map_backed_region_anywhere(my_aspace, &region, pagesz*npages, pagesz*nbacking,
+			VM_USER, BK_ARENA, pagesz, "cow-region", rgn.start);
+//	pmem_dump2console();
+
+	if(status != 0) {
+		printf("couldn't create backed region %d\n", status);
+		return -1;
+	}
+	printf("region %p\n", region);
+//	aspace_dump2console(my_aspace);
+	printf("  Begin Benchmark (time to touch %d %d byte pages):\n", npages, pagesz);
+	buf = (char*)region;
+//	buf = (char*)0x000000000b800000;
+	s.arg[0] = buf;
+	s.user_id = 1;
+	if((status = task_create(&s, &tid))) {
+		printf("couldn't create %d\n", status);
+		return -1;
+	}
+	for(l = 1; l < 20; l++){
+		len <<= 1;
+		printf("With buflen %d\n", len);
+		gettimeofday(&start, NULL);
+//		start = now();
+		for(i = 0; i < ITERS; i++) {
+//			iter_start = now();
+			for(j = 0; j < len; j++){
+				// simulate instructions
+				buf[j] = 0xe;
+				for(k = 0; k < nflop; k++) {
+					buf[j]+=1.0;
+				}
+			}
+//			cp_start = now();
+			status = aspace_copy(MY_ID, &shared_id, 0);
+//			cp_end = now();
+//			cps[i] = cp_end - cp_start;
+			if(status != 0) {
+				printf("couldn't copy aspace %d %d\n", MY_ID, shared_id);
+				return -1;
+			}
+			//set_start = now();
+			//status = aspace_set_region(MY_ID, buf, len, BK_ARENA);
+			//set_end = now();
+			//sets[i] = set_end - set_start;
+			//if(status != 0) {
+			//	printf("couldn't set region %d %p\n", MY_ID, buf);
+			//	return -1;
+			//}
+//			iter_end = now();
+//			iters[i] = iter_end - iter_start;
+		}
+		gettimeofday(&end, NULL);
+//		cp_avg = 0.0;
+//		printf("	  Time per Iteration:\n");
+//		for(i = 0; i < ITERS; i++){
+//			printf("		%.0f ns\n", iters[i] * 1.e9);
+//		}
+		timersub(&end, &start, &total);
+		printf(" TOTAL TIME %ld.%06ld \n", total.tv_sec, total.tv_usec);
+////		printf("      Average Time/iteration: %.0f ns\n", (end - start) * 1.e9 / (ITERS * 1.0));
+//
+////		printf("      Average Time/page: %.0f ns\n", (end - start) * 1.e9 / (npages * 1.0));
+//		printf("	  Time per Copy:\n");
+//		cp_avg = 0.0;
+//		for(i = 0; i < ITERS; i++){
+//			printf("		%.0f ns\n", cps[i] * 1.e9);
+//			cp_avg += cps[i] * 1.e9;
+//		}
+//		printf("	  Average Time per Copy: %.0f ns\n", cp_avg/(ITERS * 1.0));
+//
+//		printf("	  Time per Set:\n");
+//		set_avg = 0.0;
+//		for(i = 0; i < ITERS; i++){
+//			printf("		%.0f ns\n", sets[i] * 1.e9);
+//			set_avg += sets[i] * 1.e9;
+//		}
+//		printf("	  Average Time per Set: %.0f ns\n", set_avg/(ITERS * 1.0));
+	}
+
+
+	// map something
+	// map it cow.
+	// do it on separate cpus
+	// do it on the same cpus
+	// come up with ways to understand the numa topology.
+
+
+	printf("    Success.\n");
+
+	printf("TEST END:   TCASM API\n");
+}
+
+static int
+cow_api_test(void)
+{
+	int i;
+	int status;
+	id_t global_aspace, my_aspace;
+	vaddr_t region;
+	char *array;
+	int pagesz;
+	int npages;
+	int nbacking;
+	double start, end;
+	char *nofault;
+
+
+	// allow an argument?
+	pagesz = 4096;
+	npages = 1024;
+	nbacking = 8;
+
+	printf("\n");
+	printf("TEST BEGIN: COW API\n");
+	aspace_get_myid(&my_aspace);
+	printf("backed region anywhere\n");
+	arena_map_backed_region_anywhere(my_aspace, &region, pagesz*npages, pagesz*nbacking,
+			VM_USER, BK_ARENA, pagesz, "cow-region", 0x0000000616d000);
+	printf("  Begin Benchmark (time to touch %d %d byte pages):\n", npages, pagesz);
+	start = now();
+	array = (char*)region;
+	for(i = 0; i < pagesz*npages; i++)
+		array[i] = 0xb0;
+	end = now();
+	printf("      Average Time/backed page: %.0f ns\n", (end - start) * 1.e9 / (npages * 1.0));
+
+	nofault = malloc(pagesz * npages);
+	start = now();
+	array = nofault;
+	for(i = 0; i < pagesz*npages; i++)
+		array[i] = 0xb0;
+	end = now();
+	printf("      Average Time/page: %.0f ns\n", (end - start) * 1.e9 / (npages * 1.0));
+
+	// map something
+	// map it cow.
+	printf("    Success.\n");
+
+	printf("TEST END:   COW API\n");
 	return 0;
 }

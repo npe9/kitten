@@ -191,6 +191,10 @@ SYSCALL2(aspace_unsmartmap, id_t, id_t);
 SYSCALL3(aspace_virt_to_phys, id_t, vaddr_t, paddr_t *);
 SYSCALL1(aspace_dump2console, id_t);
 
+SYSCALL4(aspace_set_region, id_t, vaddr_t, size_t, bkflags_t);
+SYSCALL3(aspace_sync_region, id_t, vaddr_t, size_t);
+SYSCALL3(aspace_copy, id_t, id_t *, int);
+
 /**
  * Task management.
  */
@@ -212,3 +216,10 @@ SYSCALL2(elf_hwcap, id_t, uint32_t *);
  * Palacios hypervisor control system calls.
  */
 SYSCALL2(v3_start_guest, vaddr_t, size_t);
+
+/**
+ * Query kernel for state
+ */
+
+SYSCALL6(kernel_query, int *, int, void *, size_t, void *, size_t);
+

@@ -33,6 +33,7 @@ obj-y := \
 	fdTable.o \
 	workq.o \
 	percpu.o \
+	kernel_query.o\
 
 obj-$(CONFIG_KGDB) += kgdb.o
 obj-$(CONFIG_KGDB_SERIAL_CONSOLE) += kgdboc.o

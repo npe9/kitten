@@ -1,0 +1,164 @@
+Attaching to process 14079
+Reading symbols from /home/npe/src/usrc-cowsh/compbench/compbench...done.
+Reading symbols from /lib/x86_64-linux-gnu/librt.so.1...Reading symbols from /usr/lib/debug/lib/x86_64-linux-gnu/librt-2.17.so...done.
+done.
+Loaded symbols for /lib/x86_64-linux-gnu/librt.so.1
+Reading symbols from /usr/local/lib/libxpmem.so.0...done.
+Loaded symbols for /usr/local/lib/libxpmem.so.0
+Reading symbols from /lib/x86_64-linux-gnu/libpthread.so.0...Reading symbols from /usr/lib/debug/lib/x86_64-linux-gnu/libpthread-2.17.so...done.
+done.
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+Loaded symbols for /lib/x86_64-linux-gnu/libpthread.so.0
+Reading symbols from /lib/x86_64-linux-gnu/libc.so.6...Reading symbols from /usr/lib/debug/lib/x86_64-linux-gnu/libc-2.17.so...done.
+done.
+Loaded symbols for /lib/x86_64-linux-gnu/libc.so.6
+Reading symbols from /lib64/ld-linux-x86-64.so.2...Reading symbols from /usr/lib/debug/lib/x86_64-linux-gnu/ld-2.17.so...done.
+done.
+Loaded symbols for /lib64/ld-linux-x86-64.so.2
+0x00007f4d16f9e680 in __libc_wait (stat_loc=0x7fffaa56d9e0) at ../sysdeps/unix/sysv/linux/wait.c:31
+31	../sysdeps/unix/sysv/linux/wait.c: No such file or directory.
+#0  0x00007f4d16f9e680 in __libc_wait (stat_loc=0x7fffaa56d9e0) at ../sysdeps/unix/sysv/linux/wait.c:31
+#1  0x0000000000405980 in mmapspawn (w=0x7fffaa56db00) at mmap.c:128
+#2  0x000000000040204c in runbenchmark (line=0x7fffaa56f853 "16777216 16777216 0 0 4 5 mmap") at compbench.c:150
+#3  0x00000000004022e4 in main (argc=3, argv=0x7fffaa56f488) at compbench.c:188
+#1  0x0000000000405980 in mmapspawn (w=0x7fffaa56db00) at mmap.c:128
+128					wait(&status);
+quit
+A debugging session is active.
+
+	Inferior 1 [process 14079] will be detached.
+
+Quit anyway? (y or n) Detaching from program: /home/npe/src/usrc-cowsh/compbench/compbench, process 14079
+Attaching to process 14361
+Reading symbols from /home/npe/src/usrc-cowsh/compbench/compbench...done.
+Reading symbols from /lib/x86_64-linux-gnu/librt.so.1...Reading symbols from /usr/lib/debug/lib/x86_64-linux-gnu/librt-2.17.so...done.
+done.
+Loaded symbols for /lib/x86_64-linux-gnu/librt.so.1
+Reading symbols from /usr/local/lib/libxpmem.so.0...done.
+Loaded symbols for /usr/local/lib/libxpmem.so.0
+Reading symbols from /lib/x86_64-linux-gnu/libpthread.so.0...Reading symbols from /usr/lib/debug/lib/x86_64-linux-gnu/libpthread-2.17.so...done.
+done.
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+Loaded symbols for /lib/x86_64-linux-gnu/libpthread.so.0
+Reading symbols from /lib/x86_64-linux-gnu/libc.so.6...Reading symbols from /usr/lib/debug/lib/x86_64-linux-gnu/libc-2.17.so...done.
+done.
+Loaded symbols for /lib/x86_64-linux-gnu/libc.so.6
+Reading symbols from /lib64/ld-linux-x86-64.so.2...Reading symbols from /usr/lib/debug/lib/x86_64-linux-gnu/ld-2.17.so...done.
+done.
+Loaded symbols for /lib64/ld-linux-x86-64.so.2
+0x00007f6b0c3cc680 in __libc_wait (stat_loc=0x7fff7583cd40) at ../sysdeps/unix/sysv/linux/wait.c:31
+31	../sysdeps/unix/sysv/linux/wait.c: No such file or directory.
+#0  0x00007f6b0c3cc680 in __libc_wait (stat_loc=0x7fff7583cd40) at ../sysdeps/unix/sysv/linux/wait.c:31
+#1  0x0000000000405a64 in mmapspawn (w=0x7fff7583ce60) at mmap.c:129
+#2  0x000000000040204c in runbenchmark (line=0x7fff75840853 "16777216 16777216 0 0 4 5 mmap") at compbench.c:150
+#3  0x00000000004022e4 in main (argc=3, argv=0x7fff7583e7e8) at compbench.c:188
+quit
+A debugging session is active.
+
+	Inferior 1 [process 14361] will be detached.
+
+Quit anyway? (y or n) Detaching from program: /home/npe/src/usrc-cowsh/compbench/compbench, process 14361
+Attaching to process 14822
+Reading symbols from /home/npe/src/usrc-cowsh/compbench/compbench...done.
+Reading symbols from /lib/x86_64-linux-gnu/librt.so.1...Reading symbols from /usr/lib/debug/lib/x86_64-linux-gnu/librt-2.17.so...done.
+done.
+Loaded symbols for /lib/x86_64-linux-gnu/librt.so.1
+Reading symbols from /usr/local/lib/libxpmem.so.0...done.
+Loaded symbols for /usr/local/lib/libxpmem.so.0
+Reading symbols from /lib/x86_64-linux-gnu/libpthread.so.0...Reading symbols from /usr/lib/debug/lib/x86_64-linux-gnu/libpthread-2.17.so...done.
+done.
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+Loaded symbols for /lib/x86_64-linux-gnu/libpthread.so.0
+Reading symbols from /lib/x86_64-linux-gnu/libc.so.6...Reading symbols from /usr/lib/debug/lib/x86_64-linux-gnu/libc-2.17.so...done.
+done.
+Loaded symbols for /lib/x86_64-linux-gnu/libc.so.6
+Reading symbols from /lib64/ld-linux-x86-64.so.2...Reading symbols from /usr/lib/debug/lib/x86_64-linux-gnu/ld-2.17.so...done.
+done.
+Loaded symbols for /lib64/ld-linux-x86-64.so.2
+sem_wait () at ../nptl/sysdeps/unix/sysv/linux/x86_64/sem_wait.S:85
+85	../nptl/sysdeps/unix/sysv/linux/x86_64/sem_wait.S: No such file or directory.
+#0  sem_wait () at ../nptl/sysdeps/unix/sysv/linux/x86_64/sem_wait.S:85
+#1  0x0000000000405dd7 in mmapsharework (w=0x7ffff3644750) at mmap.c:192
+#2  0x0000000000401a6c in producer (v=0x7ffff3644750) at compbench.c:43
+#3  0x0000000000405bc6 in mmapspawn (w=0x7ffff3644750) at mmap.c:158
+#4  0x000000000040204c in runbenchmark (line=0x7ffff3644fe0 "40960 4096 0 0 4 5 base") at compbench.c:150
+#5  0x0000000000402499 in main (argc=2, argv=0x7ffff36460d8) at compbench.c:223
+quit
+A debugging session is active.
+
+	Inferior 1 [process 14822] will be detached.
+
+Quit anyway? (y or n) Detaching from program: /home/npe/src/usrc-cowsh/compbench/compbench, process 14822
+Attaching to process 14884
+Reading symbols from /home/npe/src/usrc-cowsh/compbench/compbench...done.
+Reading symbols from /lib/x86_64-linux-gnu/librt.so.1...Reading symbols from /usr/lib/debug/lib/x86_64-linux-gnu/librt-2.17.so...done.
+done.
+Loaded symbols for /lib/x86_64-linux-gnu/librt.so.1
+Reading symbols from /usr/local/lib/libxpmem.so.0...done.
+Loaded symbols for /usr/local/lib/libxpmem.so.0
+Reading symbols from /lib/x86_64-linux-gnu/libpthread.so.0...Reading symbols from /usr/lib/debug/lib/x86_64-linux-gnu/libpthread-2.17.so...done.
+done.
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+Loaded symbols for /lib/x86_64-linux-gnu/libpthread.so.0
+Reading symbols from /lib/x86_64-linux-gnu/libc.so.6...Reading symbols from /usr/lib/debug/lib/x86_64-linux-gnu/libc-2.17.so...done.
+done.
+Loaded symbols for /lib/x86_64-linux-gnu/libc.so.6
+Reading symbols from /lib64/ld-linux-x86-64.so.2...Reading symbols from /usr/lib/debug/lib/x86_64-linux-gnu/ld-2.17.so...done.
+done.
+Loaded symbols for /lib64/ld-linux-x86-64.so.2
+sem_wait () at ../nptl/sysdeps/unix/sysv/linux/x86_64/sem_wait.S:85
+85	../nptl/sysdeps/unix/sysv/linux/x86_64/sem_wait.S: No such file or directory.
+#0  sem_wait () at ../nptl/sysdeps/unix/sysv/linux/x86_64/sem_wait.S:85
+#1  0x0000000000405d4b in mmapsharework (w=0x7fff879e7da0) at mmap.c:175
+#2  0x0000000000401a6c in producer (v=0x7fff879e7da0) at compbench.c:43
+#3  0x0000000000405b3a in mmapspawn (w=0x7fff879e7da0) at mmap.c:141
+#4  0x000000000040204c in runbenchmark (line=0x7fff879e8630 "40960 4096 0 0 4 5 base") at compbench.c:150
+#5  0x0000000000402499 in main (argc=2, argv=0x7fff879e9728) at compbench.c:223
+#1  0x0000000000405d4b in mmapsharework (w=0x7fff879e7da0) at mmap.c:175
+175		sem_wait(&x->empty);
+Quit
+A debugging session is active.
+
+	Inferior 1 [process 14884] will be detached.
+
+Quit anyway? (y or n) Detaching from program: /home/npe/src/usrc-cowsh/compbench/compbench, process 14884
+Attaching to process 14958
+Reading symbols from /home/npe/src/usrc-cowsh/compbench/compbench...done.
+Reading symbols from /lib/x86_64-linux-gnu/librt.so.1...Reading symbols from /usr/lib/debug/lib/x86_64-linux-gnu/librt-2.17.so...done.
+done.
+Loaded symbols for /lib/x86_64-linux-gnu/librt.so.1
+Reading symbols from /usr/local/lib/libxpmem.so.0...done.
+Loaded symbols for /usr/local/lib/libxpmem.so.0
+Reading symbols from /lib/x86_64-linux-gnu/libpthread.so.0...Reading symbols from /usr/lib/debug/lib/x86_64-linux-gnu/libpthread-2.17.so...done.
+done.
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+Loaded symbols for /lib/x86_64-linux-gnu/libpthread.so.0
+Reading symbols from /lib/x86_64-linux-gnu/libc.so.6...Reading symbols from /usr/lib/debug/lib/x86_64-linux-gnu/libc-2.17.so...done.
+done.
+Loaded symbols for /lib/x86_64-linux-gnu/libc.so.6
+Reading symbols from /lib64/ld-linux-x86-64.so.2...Reading symbols from /usr/lib/debug/lib/x86_64-linux-gnu/ld-2.17.so...done.
+done.
+Loaded symbols for /lib64/ld-linux-x86-64.so.2
+sem_wait () at ../nptl/sysdeps/unix/sysv/linux/x86_64/sem_wait.S:85
+85	../nptl/sysdeps/unix/sysv/linux/x86_64/sem_wait.S: No such file or directory.
+#0  sem_wait () at ../nptl/sysdeps/unix/sysv/linux/x86_64/sem_wait.S:85
+#1  0x0000000000405d71 in mmapsharework (w=0x7fff9d4ff6d0) at mmap.c:178
+#2  0x0000000000401a6c in producer (v=0x7fff9d4ff6d0) at compbench.c:43
+#3  0x0000000000405b60 in mmapspawn (w=0x7fff9d4ff6d0) at mmap.c:144
+#4  0x000000000040204c in runbenchmark (line=0x7fff9d4fff60 "40960 4096 0 0 4 5 base") at compbench.c:150
+#5  0x0000000000402499 in main (argc=2, argv=0x7fff9d501058) at compbench.c:223
+#1  0x0000000000405d71 in mmapsharework (w=0x7fff9d4ff6d0) at mmap.c:178
+178		sem_wait(&x->empty);
+$1 = {__size = {0, 0, 0, 0, 0, 0, 0, 0, 1, 0 <repeats 23 times>}, __align = 0}
+$2 = {0, 0, 0, 0, 0, 0, 0, 0, 1, 0 <repeats 23 times>}
+quit
+A debugging session is active.
+
+	Inferior 1 [process 14958] will be detached.
+
+Quit anyway? (y or n) Detaching from program: /home/npe/src/usrc-cowsh/compbench/compbench, process 14958

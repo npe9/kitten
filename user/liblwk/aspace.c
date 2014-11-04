@@ -56,3 +56,30 @@ retry:
 
 	return 0;
 }
+
+/* user is responsible for freeing user tree memory */
+int
+aspace_get(char *buf, int len)
+{
+	int i;
+	struct user_aspace *ua;
+	struct user_region *ur;
+	struct user_tree *t;
+
+	// need to allocate the buffer
+	// also need to have pointers
+	// there are thwo structure types.
+	// how do I allocate this?
+	len = 8192;
+	kernel_query(CTL_ASPACE, 1, buf, &len, NULL, NULL);
+	t = (struct user_tree*)buf;
+	ur = (struct region*)(buf + sizeof(struct user_tree) + t->count*sizeof(struct user_aspace));
+	for(i = 0; i < t->count; i++){
+		ua = &t->aspaces[i];
+		ua->regions = ur;
+		ur += ua->count*sizeof(struct user_region);
+	}
+	return 0;
+}
+
+
