@@ -4,7 +4,7 @@ include $(BASE)/Makefile.header
 PROGRAMS = hello_world
 
 hello_world_SOURCES = hello_world.c sched_getcpu.c
-hello_world_LDADD   = -llwk -lpthread
+hello_world_LDADD   = -llwk -lpthread -lxpmem -L../xpmem/lib
 
 # Embed an ISO image to use for booting guest OSes in the hello_world
 # ELF executable.  The data is placed in the .rawdata ELF section, which
