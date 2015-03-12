@@ -233,6 +233,8 @@ arch_aspace_copy(
 	/* Walk and then copy the Page Global Directory */
 	pgd = aspace->arch.pgd;
 	newpgd = kmem_get_pages(0);
+        if(newpgd == NULL)
+          panic("couldn't get newpgd"); 
 	memcpy(newpgd, pgd, 512*sizeof(*pgd));
 //	printk(KERN_DEBUG "memcpied\n");
 
@@ -242,6 +244,8 @@ arch_aspace_copy(
 		/* Walk and then copy the Page Upper Directory */
 		pud = __va(xpte_paddr(&pgd[i]));
 		newpud = kmem_get_pages(0);
+                if(newpud == NULL)
+                  panic("couldn't get newpud");
 		memcpy(newpud, pud, 512*sizeof(*pud));
 		for (j = 0; j < 512; j++) {
 			if (!pud[j].present || pud[j].pagesize)
@@ -250,6 +254,8 @@ arch_aspace_copy(
 			/* Walk and then copy the Page Middle Directory */
 			pmd = __va(xpte_paddr(&pud[j]));
 			newpmd = kmem_get_pages(0);
+                        if(newpmd == NULL)
+                          panic("couldn't get newpmd");
 			memcpy(newpmd, pmd, 512*sizeof(*pmd));
 			for (k = 0; k < 512; k++) {
 				if (!pmd[k].present || pmd[k].pagesize)
@@ -257,6 +263,8 @@ arch_aspace_copy(
 				/* Copy the last level Page Table Directory */
 				ptd = __va(xpte_paddr(&pmd[k]));
 				newptd = kmem_get_pages(0);
+                                if(newptd == NULL)
+                                  panic("couldn't get newptd");
 				memcpy(newptd, ptd, 512*sizeof(*ptd));
 			}
 		}
@@ -615,8 +623,8 @@ write_pte(
 		_pte.pagesize = 1;
 
 	*pte = _pte;
-//	printk(KERN_WARNING "WROTE pte accessed %x base_paddr %p dirty %x global %x no_exec %x os_bits_1 %x\n"
-//			"os_bits_2 %x pagesize %x pcd %x present %x pwt %x user %x write %x\n",
+//	printk(KERN_WARNING "WROTE pte paddr 0x%lx accessed %x base_paddr %p dirty %x global %x no_exec %x os_bits_1 %x\n"
+//			"os_bits_2 %x pagesize %x pcd %x present %x pwt %x user %x write %x\n", paddr,
 //			pte->accessed, pte->base_paddr, pte->dirty, pte->global,
 //			pte->no_exec, pte->os_bits_1, pte->os_bits_2, pte->pagesize,
 //			pte->pcd, pte->present, pte->pwt, pte->user, pte->write);
@@ -869,8 +877,7 @@ do_page(struct aspace *aspace, vaddr_t addr, vmflags_t flags, vmpagesize_t pages
 //		printk(KERN_DEBUG "new paging\n");
 
 		aspace->as_ops->new_page(aspace, pagesz, &newpaddr);
-
-		//printk(KERN_WARNING "successfully newpaged with new page at %p\n", newpaddr);
+//		printk(KERN_WARNING "successfully newpaged with new page at %p\n", newpaddr);
 		// XXX: error check here.
 //		tmppte = find_or_create_pte(aspace, __va(paddr), VM_PAGE_2MB);
 		//tmppte = find_or_create_pte(aspace, addr, VM_PAGE_4KB);
@@ -881,7 +888,7 @@ do_page(struct aspace *aspace, vaddr_t addr, vmflags_t flags, vmpagesize_t pages
 		//arch_aspace_pte_dump_qemu(aspace);
 		//printk("\n");
 		// FIXME(npe) this is a kludge
-		*(long int*)pte &= 0x8000000000ffffff;
+//		*(long int*)pte &= 0x8000000000ffffff;
 
 
 		asm volatile ( "invlpg %0" : : "m"(addr) : "memory" );

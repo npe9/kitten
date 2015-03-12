@@ -20,6 +20,7 @@
 #include <unistd.h>
 #include <sys/syscall.h>
 #include <lwk/task.h>
+#include <xpmem.h>
 static int pmem_api_test(void);
 static int aspace_api_test(void);
 static int task_api_test(void);
@@ -29,6 +30,7 @@ static int socket_api_test(void);
 static int hypervisor_api_test(void);
 static int cow_api_test(void);
 static int tcasm_api_test(void);
+static int xpmem_api_test(void);
 
 int
 main(int argc, char *argv[], char *envp[])
@@ -46,6 +48,7 @@ main(int argc, char *argv[], char *envp[])
 		printf("  envp[%d] = %s\n", i, envp[i]);
 
 	pmem_api_test();
+        xpmem_api_test();
 	aspace_api_test();
 	tcasm_api_test();
     cow_api_test();
@@ -111,6 +114,47 @@ pmem_api_test(void)
 
 	printf("TEST END:   Physical Memory Management\n");
 	return 0;
+}
+
+static int
+xpmem_api_test(void)
+{
+  int buf[8192];
+  xpmem_segid_t seg;
+  xpmem_apid_t apid;
+  int i, status;
+  void *vaddr;
+  struct xpmem_addr addr;
+
+  printf("TEST BEGIN: XPMEM API\n");
+  printf("buf address 0x%x\n",buf);
+  for(i=0; i<8192; i++)
+    buf[i]=i; 
+  seg = xpmem_make(&buf, 8192*sizeof(int), XPMEM_PERMIT_MODE, 0777);
+  if(seg == NULL){
+  //if(status != 0){
+    printf("ERROR: xpmem_make() status=%d\n", status);
+    return -1;
+  }
+  printf("made xpmem segment seg=%x\n", seg);
+  apid = xpmem_get(seg, XPMEM_RDWR, XPMEM_PERMIT_MODE, 0777);
+  if(apid == NULL){
+    printf("ERROR: xpmem_get() status=%d\n", status);
+    return -1;
+  }
+  printf("got xpmem segment apid=%x\n", apid);
+  addr.apid = apid;
+  addr.offset = 0;
+  vaddr = xpmem_attach(addr, 8192*sizeof(int), NULL);
+  
+  if(vaddr == -1) {
+    printf("ERROR: xpmem_attach() failed\n");
+    return -1;
+  }
+  printf("attached at vaddr 0x%x\n", vaddr);
+  printf("vaddr 1 %d vaddr 2 %d vaddr 3 %d vaddr 4 %d\n", *((int*)vaddr),*((int*)vaddr+1), *((int*)vaddr+2),*((int*)vaddr+3));
+  printf("TEST END: XPMEM API\n");
+  return 0;
 }
 
 static int
@@ -668,8 +712,8 @@ hypervisor_api_test(void)
 }
 
 // TODO(npe): make this a command line option
-int len = 2048;
-#define ITERS 10
+int len = 4096;
+#define ITERS 128
 volatile id_t shared_id;
 
 static int
@@ -693,6 +737,7 @@ tcasm_observer(void *v)
 			;
 		printf("new id %d old id %d\n", shared_id, cur_id);
 		aspace_destroy(cur_id);
+                printf("I destroyed an aspace\n");
 		cur_id = shared_id;
 		//aspace_dump2console(my_id);
 
@@ -742,8 +787,8 @@ tcasm_api_test(void)
 	double cp_avg, set_avg;
 
 	int pagesz = VM_PAGE_4KB;
-	int npages = 2048*2;
-	int nbacking = 2048*2;
+	int npages = len/pagesz*2;
+	int nbacking = len/pagesz*64;
 
 	// TODO(npe): allow the user to state how much should be benchmarked.
 	nflop = 1;
@@ -790,15 +835,16 @@ tcasm_api_test(void)
 	snprintf(s.task_name,32,"tcasm observer");
 	s.use_args = 1;
 	aspace_get_myid(&my_aspace);
-	if((status = pmem_alloc_umem(1000*VM_PAGE_4KB, VM_PAGE_4KB, &rgn))){
+	if((status = pmem_alloc_umem((npages+nbacking)*pagesz, pagesz, &rgn))){
                 return -1;
                 // error handling.
         }
 	printf("backed rgn size %d %p %p %d\n", rgn.size, rgn.start, rgn.end, rgn.end - rgn.start);
 //	pmem_dump2console();
-	status = arena_map_backed_region_anywhere(my_aspace, &region, pagesz*npages, pagesz*nbacking,
+	printf("mapping npages 0x%lx pagesz 0x%lx npages*pagesz 0x%lx nbacking 0x%lx nbacking*pagesz 0x%lx (npages+nbacking)*pagesz 0x%lx\n", npages, pagesz, npages * pagesz, nbacking, nbacking*pagesz, (npages+nbacking)*pagesz);
+	status = arena_map_backed_region_anywhere(my_aspace, &region, npages*pagesz, nbacking*pagesz,
 			VM_USER, BK_ARENA, pagesz, "cow-region", rgn.start);
-//	pmem_dump2console();
+	pmem_dump2console();
 
 	if(status != 0) {
 		printf("couldn't create backed region %d\n", status);
@@ -806,6 +852,7 @@ tcasm_api_test(void)
 	}
 	printf("region %p\n", region);
 //	aspace_dump2console(my_aspace);
+//	pmem_dump2console();
 	printf("  Begin Benchmark (time to touch %d %d byte pages):\n", npages, pagesz);
 	buf = (char*)region;
 //	buf = (char*)0x000000000b800000;
@@ -816,19 +863,25 @@ tcasm_api_test(void)
 		return -1;
 	}
 	for(l = 1; l < 20; l++){
-		len <<= 1;
+//                sleep(1);
 		printf("With buflen %d\n", len);
 		gettimeofday(&start, NULL);
+
 //		start = now();
+		printf("buf start 0x%lx end 0x%lx\n", buf, buf+len);
+//		for(;;);
 		for(i = 0; i < ITERS; i++) {
 //			iter_start = now();
 			for(j = 0; j < len; j++){
 				// simulate instructions
+//				printf("j %d buf 0x%lx\n", j, &buf[j]);
 				buf[j] = 0xe;
+//				printf("successful set\n");
 				for(k = 0; k < nflop; k++) {
 					buf[j]+=1.0;
 				}
 			}
+			printf("finished\n");
 //			cp_start = now();
 			status = aspace_copy(MY_ID, &shared_id, 0);
 //			cp_end = now();
@@ -847,6 +900,8 @@ tcasm_api_test(void)
 			//}
 //			iter_end = now();
 //			iters[i] = iter_end - iter_start;
+			len <<= 1;
+
 		}
 		gettimeofday(&end, NULL);
 //		cp_avg = 0.0;

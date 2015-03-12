@@ -193,7 +193,7 @@ aspace_subsys_init(void)
 
 	/* Create a hash table that will be used for quick ID->aspace lookups */
 	htable = htable_create(
-			7,  /* 2^7 bins in the hash table */
+			9,  /* 2^7 bins in the hash table */
 			offsetof(struct aspace, id),
 			offsetof(struct aspace, ht_link),
 			htable_id_hash,
@@ -694,7 +694,7 @@ __aspace_map_pmem(struct aspace *aspace,
 
 		/* Map until full extent mapped or end of region is reached */
 		while (extent && (start < rgn->end)) {
-
+//			printk(KERN_WARNING " mapping page pmem 0x%lx\n", pmem);
 			status = 
 			arch_aspace_map_page(
 				aspace,
@@ -711,7 +711,6 @@ __aspace_map_pmem(struct aspace *aspace,
 			pmem   += rgn->pagesz;
 		}
 	}
-
 	return 0;
 }
 

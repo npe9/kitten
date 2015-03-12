@@ -59,9 +59,7 @@ retry:
 			goto retry; /* we lost a race with someone */
 		goto fail;
 	}
-//	printf("after first region:\n");
-//	aspace_dump2console(id);
-//	printf("adding region\n");
+
 
 	// XXX: change the backing region to have a name too.
 	if ((status = aspace_add_region(id, *start+extent, backing_extent, (VM_USER |VM_WRITE|VM_READ), pagesz, name))) {
@@ -69,16 +67,17 @@ retry:
 			goto retry; /* we lost a race with someone */
 		goto first_region_cleanup;
 	}
-//	printf("after second region:\n");
-//	aspace_dump2console(id);
 
-	printf("mapping pmem pmem %llx start %llx xtent extent %llx backing %llx\n", pmem, *start, extent, backing_extent);
-	if ((status = aspace_map_pmem(id, pmem, *start, extent)))
+
+	printf("mapping pmem pmem %llx start %llx extent %llx backing %llx\n", pmem, *start, extent, backing_extent);
+	if ((status = aspace_map_pmem(id, pmem, *start, extent))){
+		printf("status %d", status);
 		goto all_region_cleanup;
+	}
 	printf("mapping pmem 2 pmem+extent %llx *start+extent %llx\n", pmem+extent, *start+extent);
 	if ((status = aspace_map_pmem(id, pmem+extent, *start+extent, backing_extent)))
 		goto first_pmem_cleanup;
-	printf("mapping pmem 3 *start+extent %llx backing_extent llx\n", *start+extent, backing_extent);
+	printf("mapping pmem 3 *start+extent %llx backing_extent %llx\n", *start+extent, backing_extent);
 	if((status = aspace_set_region(id, *start+extent, backing_extent, BK_ARENA)))
 		goto all_pmem_cleanup;
 

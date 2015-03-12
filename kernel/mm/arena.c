@@ -89,7 +89,7 @@ int arena_new_page(struct aspace *aspace, vmpagesize_t pagesz, paddr_t *paddr) {
 //	for(;;);
 	// what do we have to do to do this?
 //	printk("printing without %p\n", arena);
-	//printk("mapping pmem brk %p\n", arena->brk);
+//	printk("mapping pmem brk %p\n", arena->brk);
 
 //	*paddr = kmem_get_pages(0);
 	if((arena->brk + 4096) >= arena->end)
@@ -208,7 +208,8 @@ int arena_init(struct aspace *aspace, paddr_t start, size_t extent) {
 	struct pmem_region	*result;
 
 	result = kmem_alloc(sizeof(struct pmem_region));
-
+        if(result == NULL)
+          panic("couldn't alloc arena");
 
 
 	pmem_region_unset_all(&query);
