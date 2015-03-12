@@ -6,6 +6,7 @@
 #include <lwk/types.h>
 #include <lwk/idspace.h>
 #include <lwk/futex.h>
+#include <lwk/cpumask.h>
 #include <arch/aspace.h>
 
 
@@ -35,7 +36,7 @@
 // XXX: is there any reason to make these match the linux side?
 #define VM_COW		(1 << 10)
 typedef unsigned long vmflags_t;
-
+typedef unsigned long bkflags_t;
 
 // Symbolic names for various page sizes.
 // Note that a given architecture will likely only support a subset of these.
@@ -66,6 +67,14 @@ struct user_tree {
 };
 
 
+typedef struct {
+	vaddr_t     start;
+	vaddr_t     end;
+	paddr_t     paddr;
+	vmflags_t   flags; 
+} aspace_mapping_t;
+
+
 // Begin core address space management API.
 // These are accessible from both kernel-space and user-space (via syscalls).
 
@@ -84,6 +93,12 @@ aspace_create(
 extern int
 aspace_destroy(
 	id_t			id
+);
+
+extern int
+aspace_update_user_cpumask(
+        id_t                    id,
+	user_cpumask_t *        cpu_mask
 );
 
 extern int
@@ -148,10 +163,35 @@ aspace_virt_to_phys(
 	paddr_t *		paddr
 );
 
+extern int
+aspace_lookup_mapping(
+        id_t                    id, 
+	vaddr_t                 vaddr,
+	aspace_mapping_t *      mapping
+);
+
 extern int aspace_dump2console(
 	id_t			id
 );
 
+extern int aspace_copy(
+  id_t src,
+  id_t *dest,
+  int flags
+);
+
+extern int aspace_set_region(
+  id_t id,
+  vaddr_t start,
+  size_t extent,
+  bkflags_t type
+);
+
+extern int aspace_sync_region(
+	id_t id,
+	vaddr_t start,
+	size_t extent
+);
 // End core address space management API
 
 
@@ -177,6 +217,13 @@ aspace_map_region_anywhere(
 	vmpagesize_t		pagesz,
 	const char *		name,
 	paddr_t			pmem
+);
+
+extern int
+aspace_unmap_region(
+	id_t                    id,
+	vaddr_t                 start,
+	size_t                  extent
 );
 
 // End convenience functions defined in liblwk
@@ -300,6 +347,7 @@ __aspace_del_region(
 	size_t			extent
 );
 
+
 extern int
 __aspace_map_pmem(
 	struct aspace *		aspace,
@@ -346,6 +394,15 @@ __init aspace_subsys_init(
 	void
 );
 
+extern int
+aspace_update_cpumask(
+        id_t               id,
+	cpumask_t *        cpu_mask
+);
+
+
+
+
 extern struct aspace *
 aspace_acquire(
 	id_t			id
@@ -362,6 +419,11 @@ aspace_wait4_child_exit(
 	bool			block,
 	id_t *			exit_id,
 	int *			exit_status
+);
+
+extern int
+handle_page_fault(
+  vaddr_t cr2
 );
 
 // End kernel-only address space management API
@@ -435,13 +497,24 @@ arch_aspace_copy(
 		struct aspace *		dst
 );
 
-extern int
-aspace_enum(
-		char **buf,
-		int *len
+extern void
+arch_aspace_pte_dump_qemu(
+    struct aspace *  aspace 
 );
 
+extern int
+aspace_enum(
+		void **buf,
+		size_t *len
+);
 
+extern int
+do_page(
+  struct aspace *aspace,
+  vaddr_t addr,
+  vmflags_t flags,
+  vmpagesize_t pagesz
+);
 // End architecture specific address space functions
 
 
@@ -463,6 +536,13 @@ extern int
 sys_aspace_destroy(
 	id_t			id
 );
+
+extern int
+sys_aspace_update_user_cpumask(
+        id_t                      id,
+	user_cpumask_t __user *   cpu_mask
+);
+
 
 extern int
 sys_aspace_find_hole(

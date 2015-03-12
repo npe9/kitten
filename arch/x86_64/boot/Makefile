@@ -75,7 +75,7 @@ gimage_cmdline = default 0\ntimeout 5\n\ntitle Kitten\nroot (cd)\nkernel /boot/l
 gimage2_cmdline = set default=0\nset timeout=5\n\nmenuentry Kitten {\n\tlinux /boot/lwk ro $(FDARGS_GRUB)\n $(if $(FDINITRD),\tinitrd /boot/initrd.img,)\n}
 
 # This requires being root or having syslinux 2.02 or higher installed
-isoimage: $(BOOTIMAGE) $(FDINITRD)
+isoimage: $(BOOTIMAGE)
 	-rm -rf $(obj)/isoimage
 	mkdir $(obj)/isoimage
 
@@ -83,6 +83,9 @@ ifeq ($(CONFIG_SYSLINUX_BOOTLOADER),y)
 	for i in lib lib64 share end ; do \
 		if [ -f /usr/$$i/syslinux/isolinux.bin ] ; then \
 			cp /usr/$$i/syslinux/isolinux.bin $(obj)/isoimage ; \
+			break ; \
+		elif [ -f /usr/$$i/syslinux/bios/isolinux.bin ] ; then \
+			cp /usr/$$i/syslinux/bios/* $(obj)/isoimage ; \
 			break ; \
 		fi ; \
 		if [ $$i = end ] ; then exit 1 ; fi ; \

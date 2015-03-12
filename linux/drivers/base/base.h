@@ -67,15 +67,7 @@ struct class_private {
 extern int devices_init(void);
 extern int buses_init(void);
 extern int classes_init(void);
-extern int firmware_init(void);
-#ifdef CONFIG_SYS_HYPERVISOR
-extern int hypervisor_init(void);
-#else
-static inline int hypervisor_init(void) { return 0; }
-#endif
-extern int platform_bus_init(void);
-extern int system_bus_init(void);
-extern int cpu_dev_init(void);
+
 
 extern int bus_add_device(struct device *dev);
 extern void bus_attach_device(struct device *dev);
@@ -88,8 +80,6 @@ extern void driver_detach(struct device_driver *drv);
 extern int driver_probe_device(struct device_driver *drv, struct device *dev);
 
 extern void sysdev_shutdown(void);
-extern int sysdev_suspend(pm_message_t state);
-extern int sysdev_resume(void);
 
 extern char *make_class_name(const char *name, struct kobject *kobj);
 

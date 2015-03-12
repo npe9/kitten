@@ -11,7 +11,6 @@
 #include <lwk/aspace.h>
 
 #define BK_ARENA			(1 << 0)
-typedef unsigned long bkflags_t;
 
 extern int
 arena_map_backed_region(
@@ -39,6 +38,7 @@ arena_map_backed_region_anywhere(
 	paddr_t			pmem
 );
 
+
 extern int
 sys_aspace_set_region(
 	id_t			id,
@@ -53,5 +53,15 @@ sys_aspace_sync_region(
 	vaddr_t			start,
 	size_t			extent
 );
+
+#ifdef __KERNEL__
+
+extern int arena_init(
+  struct aspace *aspace,
+  paddr_t paddr,
+  size_t extent
+);
+
+#endif
 
 #endif 

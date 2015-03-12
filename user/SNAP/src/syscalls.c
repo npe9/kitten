@@ -332,8 +332,8 @@ int setup1_(int *nx, int *ny, int *nz, int *ng) {
     //printf("%d, %llu\n", rank, total_time);	
   }
 
-  int aspace_copy_(int my_id) {
-    aspace_copy(my_id);
+  int aspace_copy_(int my_id, int dest) {
+    aspace_copy(my_id, &dest, 0);
   }
 
   int create_shared_() {

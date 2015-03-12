@@ -451,6 +451,7 @@ scripts_basic: include/lwk/autoconf.h
 # Objects we will link into vmlwk / subdirs we need to visit
 drivers-y	:= drivers/
 net-y		:= net/
+block-y         := block/
 libs-y		:= lib/
 linux-y		:= linux/
 #core-y		:= usr/
@@ -549,18 +550,19 @@ core-y		+= kernel/ modules/
 vmlwk-dirs	:= $(patsubst %/,%,$(filter %/, $(init-y) $(init-m) \
 		     $(core-y) $(core-m) $(drivers-y) $(drivers-m) \
 		     $(linux-y) $(linux-m) \
-		     $(net-y) $(net-m) $(libs-y) $(libs-m)))
+		     $(net-y) $(net-m) $(block-y) $(block-m) $(libs-y) $(libs-m)))
 
 vmlwk-alldirs	:= $(sort $(vmlwk-dirs) $(patsubst %/,%,$(filter %/, \
 		     $(init-n) $(init-) \
 		     $(core-n) $(core-) $(drivers-n) $(drivers-) \
 		     $(linux-n) $(linux-) \
-		     $(net-n)  $(net-)  $(libs-n)    $(libs-))))
+		     $(net-n)  $(net-) $(block-n) $(block-)  $(libs-n)    $(libs-))))
 
 init-y		:= $(patsubst %/, %/built-in.o, $(init-y))
 core-y		:= $(patsubst %/, %/built-in.o, $(core-y))
 drivers-y	:= $(patsubst %/, %/built-in.o, $(drivers-y))
 net-y		:= $(patsubst %/, %/built-in.o, $(net-y))
+block-y         := $(patsubst %/, %/built-in.o, $(block-y))
 libs-y1		:= $(patsubst %/, %/lib.a, $(libs-y))
 libs-y2		:= $(patsubst %/, %/built-in.o, $(libs-y))
 libs-y		:= $(libs-y1) $(libs-y2)
@@ -597,7 +599,7 @@ libs-$(CONFIG_PALACIOS) += $(shell echo $(CONFIG_PALACIOS_PATH)/libv3vee.a)
 # System.map is generated to document addresses of all kernel symbols
 
 vmlwk-init := $(head-y) $(init-y)
-vmlwk-main := $(core-y) $(libs-y) $(drivers-y) $(net-y) $(linux-y)
+vmlwk-main := $(core-y) $(libs-y) $(drivers-y) $(net-y) $(block-y) $(linux-y)
 vmlwk-all  := $(vmlwk-init) $(vmlwk-main)
 vmlwk-lds  := arch/$(SRCARCH)/kernel/vmlwk.lds
 
@@ -736,9 +738,9 @@ vmlwk: $(vmlwk-lds) $(vmlwk-init) $(vmlwk-main) $(kallsyms.o) FORCE
 	$(call if_changed_rule,vmlwk__)
 	$(Q)rm -f .old_version
 
-ifeq ($(CONFIG_CRAY_XT),y)
+ifeq ($(CONFIG_CRAY_GEMINI),y)
 # Generate the necessary padding to push the executable image
-# to the start address since the XT3 bootloader always loads
+# to the start address since the Cray bootloader always loads
 # at 0x10000.
 vmlwk.bin: vmlwk
 	$(OBJCOPY) -O binary $< $@.tmp
@@ -1118,7 +1120,7 @@ $(module-dirs): crmodverdir
 
 modules: $(module-dirs)
 	@echo '  Building modules, stage 2.';
-	$(Q)$(MAKE) -rR -f $(srctree)/scripts/Makefile.modpost
+#	$(Q)$(MAKE) -rR -f $(srctree)/scripts/Makefile.modpost
 
 PHONY += modules_install
 modules_install: _emodinst_ _emodinst_post
@@ -1214,12 +1216,13 @@ define all-sources
 	  done ; \
 	  find $(__srctree)include/arch-generic $(RCS_FIND_IGNORE) \
 	       -name '*.[chS]' -print; \
+	  find $(__srctree)linux/include $(RCS_FIND_IGNORE) \
+	       \( -name config -o -name 'arch-*' \) -prune \
+	       -o -name '*.[chS]' -print; \
 	  for ARCH in $(ALLINCLUDE_ARCHS) ; do \
-	       find $(__srctree)linux/include/asm-$${ARCH} $(RCS_FIND_IGNORE) \
+	       find $(__srctree)linux/arch/$${ARCH} $(RCS_FIND_IGNORE) \
 	            -name '*.[chS]' -print; \
-	  done ; \
-	  find $(__srctree)linux/include/asm-generic $(RCS_FIND_IGNORE) \
-	       -name '*.[chS]' -print )
+	  done ; )
 endef
 
 quiet_cmd_cscope-file = FILELST cscope.files

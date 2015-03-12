@@ -8,21 +8,39 @@
 #ifndef _LWK_SCHED_H
 #define _LWK_SCHED_H
 
-#include <lwk/task.h>
 #include <lwk/init.h>
+#include <lwk/task.h>
+
+#include <lwk/sched_rr.h>
+#ifdef CONFIG_SCHED_EDF
+#include <lwk/sched_edf.h>
+#endif
 
 extern unsigned int sched_hz;
 
-extern int __init sched_subsys_init(void);
+extern int __init sched_init_runqueue(int cpu_id);
 extern void sched_add_task(struct task_struct *task);
 extern void sched_del_task(struct task_struct *task);
 extern int sched_wakeup_task(struct task_struct *task,
                              taskstate_t valid_states);
-extern void schedule(void); 
-extern int task_enum(void *old, int len);
+extern void sched_cpu_remove(void *);
+extern void schedule(void);
+
+extern struct task_struct *
+context_switch(struct task_struct *prev, struct task_struct *next);
 
 #define MAX_SCHEDULE_TIMEOUT TIME_T_MAX
 extern ktime_t schedule_timeout(ktime_t timeout);
+
+extern void sched_yield(void);
+extern void sched_yield_to(struct task_struct * task);
+
+extern void
+fire_sched_out_preempt_notifiers(struct task_struct * curr,
+				 struct task_struct * next);
+
+extern void
+fire_sched_in_preempt_notifiers(struct task_struct * curr);
 
 /** Each architecture must provide its own context-switch code
  * \ingroup arch
@@ -36,7 +54,7 @@ arch_context_switch(
 /** Each architecture must provide its own idle task body
  * \ingroup arch
  */
-extern void arch_idle_task_loop_body(void);
+extern void arch_idle_task_loop_body(int irqenable);
 
 /**
  * set_current_state() includes a barrier so that the write of current->state

@@ -240,7 +240,7 @@ palacios_xcall(
  * Starts a kernel thread on the specified CPU.
  */
 static void *
-palacios_start_thread_on_cpu(
+palacios_create_thread_on_cpu(
 	int			cpu_id, 
 	int			(*fn)(void * arg), 
 	void *			arg, 
@@ -390,7 +390,7 @@ palacios_start_kernel_thread(
 	void *			arg,
 	char *			thread_name)
 {
-    return kthread_create(fn, arg, thread_name);
+    return kthread_run(fn, arg, thread_name);
 }
 
 /**
@@ -468,6 +468,14 @@ palacios_mutex_unlock_irqrestore(
 	spin_unlock_irqrestore((spinlock_t *)mutex, (unsigned long)flags);
 }
 
+static void
+palacios_start_thread(void * tsk){
+
+	// Start the kernel thread executing on the target CPU's run queue
+	struct task_struct *task = (struct task_struct *)tsk;
+	sched_wakeup_task(task, TASK_ALL);
+}
+
 /**
  * Structure used by the Palacios hypervisor to interface with the host kernel.
  */
@@ -494,7 +502,8 @@ struct v3_os_hooks palacios_os_hooks = {
 	.get_cpu		= palacios_get_cpu,
 	.interrupt_cpu		= palacios_interrupt_cpu,
 	.call_on_cpu		= palacios_xcall,
-	.start_thread_on_cpu	= palacios_start_thread_on_cpu,
+	.create_thread_on_cpu	= palacios_create_thread_on_cpu,
+	.start_thread		= palacios_start_thread,
 };
 
 /**
@@ -504,7 +513,12 @@ static int
 palacios_run_guest(void *arg)
 {
 	unsigned int mask;
-	struct v3_vm_info * vm_info = v3_create_vm((void *) __va(guest_iso_start), NULL, NULL);
+
+	// set the mask to inclue all available CPUs
+	// we assume we will start on CPU 0
+	mask=~((((signed int)1<<(sizeof(unsigned int)*8-1))>>(sizeof(unsigned int)*8-1))<<cpus_weight(cpu_online_map));
+
+	struct v3_vm_info * vm_info = v3_create_vm((void *) __va(guest_iso_start), NULL, NULL, mask);
 	
 	if (!vm_info) {
 		printk(KERN_ERR "Could not create guest context\n");
@@ -514,10 +528,6 @@ palacios_run_guest(void *arg)
 	g_vm_guest = vm_info;
 
 	printk(KERN_INFO "Starting Guest OS...\n");
-
-	// set the mask to inclue all available CPUs
-	// we assume we will start on CPU 0
-	mask=~((((signed int)1<<(sizeof(unsigned int)*8-1))>>(sizeof(unsigned int)*8-1))<<cpus_weight(cpu_online_map));
 
 	return v3_start_vm(vm_info, mask);
 }

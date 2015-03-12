@@ -5,6 +5,10 @@
 #include <lwk/ptrace.h>
 #include <lwk/string.h>
 #include <lwk/delay.h>
+#include <lwk/sched.h>
+#include <lwk/aspace.h>
+#include <lwk/xcall.h>
+
 #include <arch/processor.h>
 #include <arch/desc.h>
 #include <arch/proto.h>
@@ -270,4 +274,175 @@ cpu_init(void)
 	lapic_init();		/* local advanced prog. interrupt controller */
 	time_init();		/* detects CPU frequency, udelay(), etc. */
 	barrier();		/* compiler memory barrier, avoids reordering */
+}
+
+
+
+#include <arch/mpspec.h>
+#include <lwk/cpuinfo.h>
+extern unsigned int num_cpus;
+extern unsigned char apic_version[MAX_APICS];
+extern physid_mask_t phys_cpu_present_map;
+extern void setup_per_cpu_area(int cpu);
+extern void free_per_cpu_area(int cpu);
+
+int 
+phys_cpu_add(unsigned int phys_cpu_id, unsigned int apic_id) 
+{
+	int logical_cpu;
+	cpumask_t tmp_map;
+	unsigned int timeout;
+	unsigned char apic_ver;
+
+	if (num_cpus >= NR_CPUS) {
+		printk(KERN_ERR "NR_CPUS limits of %i reached.\n", NR_CPUS);
+		return -1;
+	}
+
+	/* Count the new CPU */
+	num_cpus++;
+
+	/*
+	 * Assign a logical CPU ID.
+	 * Choose the lowest ID available
+	 */
+	 cpus_complement(tmp_map, cpu_present_map);
+	 logical_cpu = first_cpu(tmp_map);
+
+	/* JRL: 
+	 * This is most likely a bad idea, but I don't know a better thing to do
+	 * We don't have the MPTable information, which is where this is normally stored
+	 */
+	 apic_ver = apic_version[0];
+
+	 /*	
+	   if (apic_ver == 0x0) {
+		printk(KERN_ERR "BIOS bug, APIC version is 0 for PhysCPU 0! "
+		                "fixing up to 0x10. (tell your hw vendor)\n");
+		apic_ver = 0x10;
+	 }
+	 */
+	apic_version[phys_cpu_id] = apic_ver;
+
+
+	/* Add the CPU to the map of physical CPU IDs present. */
+	physid_set(phys_cpu_id, phys_cpu_present_map);
+
+	/* Add the CPU to the map of logical CPU IDs present. */
+	cpu_set(logical_cpu, cpu_present_map);
+
+	/* We now have to at minimum update the KERNEL ASPACE to allow this CPU */
+	/* NOTE: No other existing ASPACEs will be updated, so they will not be 
+	   accessible on this CPU unless they are explicitly updated. 
+	   BUT: the feature to do that does not exist yet!!!! 
+	*/
+	aspace_update_cpumask(KERNEL_ASPACE_ID, &cpu_present_map); 
+
+	/* Store ID information. */
+	cpu_info[logical_cpu].logical_id   = logical_cpu;
+	cpu_info[logical_cpu].physical_id  = phys_cpu_id;
+	cpu_info[logical_cpu].arch.apic_id = apic_id;
+
+	printk(KERN_DEBUG
+	  "Booting Physical CPU #%d -> Logical CPU #%d APIC #%d (APIC version %d)\n",
+	       phys_cpu_id,
+	       logical_cpu,
+	       apic_id,
+	       apic_version[phys_cpu_id]);
+
+	setup_per_cpu_area(logical_cpu);
+
+	arch_boot_cpu(logical_cpu);
+
+	/* Wait for ACK that CPU has booted (5 seconds max). */
+	for (timeout = 0; timeout < 50000; timeout++) {
+	    if (cpu_isset(logical_cpu, cpu_online_map))
+		break;
+	    udelay(100);
+	}
+	
+	if (!cpu_isset(logical_cpu, cpu_online_map)) {
+	    panic("Failed to boot CPU %d.\n", logical_cpu);
+	} else {
+	    printk("Logical CPU %d is now online\n", logical_cpu);
+	}
+
+	return logical_cpu;
+}
+
+/*
+ * Hot remove a target cpu
+ */
+int
+phys_cpu_remove(unsigned int phys_cpu_id,
+		unsigned int apic_id)
+{
+        unsigned int logical_id;
+        unsigned int target_cpu = -1;
+        unsigned int timeout;
+        cpumask_t    target_cpu_mask;
+
+        for_each_cpu_mask(logical_id, cpu_present_map) {
+		if ((cpu_info[logical_id].physical_id  == phys_cpu_id) &&
+		    (cpu_info[logical_id].arch.apic_id == apic_id)) {
+
+			target_cpu = logical_id;
+			break;
+		}
+        }
+
+        if (target_cpu == -1) {
+                panic("Failed to found target cpu when offlining:"
+		      "phys_id %u, apic_id %u", phys_cpu_id, apic_id);
+                return -1;
+        }
+
+        if ((cpu_info[target_cpu].physical_id  != phys_cpu_id) ||
+	    (cpu_info[target_cpu].arch.apic_id != apic_id)) {
+                panic("Inconsistent CPU found when offlining\n"
+		      "  cpu_info: target_cpu %d (phys %u, apic %u)\n"
+		      "  requested: phys %u, apic %u\n",
+		      target_cpu,
+		      cpu_info[target_cpu].physical_id,
+		      cpu_info[target_cpu].arch.apic_id,
+		      phys_cpu_id,
+		      apic_id);
+
+                return -1;
+        }
+
+        cpus_clear(target_cpu_mask);
+        cpu_set(target_cpu, target_cpu_mask);
+
+	/* Signal remote CPU to offline itself */
+        xcall_function(target_cpu_mask, sched_cpu_remove, NULL, 0);
+
+        /* Wait for ACK that CPU has offlined (5 seconds max). */
+        for (timeout = 0; timeout < 50000; timeout++) {
+		if (!cpu_isset(target_cpu, cpu_online_map)) {
+			break;
+		}
+
+		udelay(100);
+        }
+
+        if (cpu_isset(target_cpu, cpu_online_map)) {
+		panic("Failed to offline CPU %d.\n", target_cpu);
+        } else {
+		printk("Logical CPU %d (phys_id %d, apic_id %d) is now offline\n",
+		       target_cpu,
+		       cpu_info[target_cpu].physical_id,
+		       cpu_info[target_cpu].arch.apic_id);
+
+		apic_version[phys_cpu_id] = 0;
+		cpu_clear(target_cpu, cpu_present_map);
+		cpu_clear(target_cpu, cpu_initialized_map);
+		physid_clear(phys_cpu_id, phys_cpu_present_map);
+		aspace_update_cpumask(KERNEL_ASPACE_ID, &cpu_present_map);
+
+		kmem_free_pages((void *)cpu_gdt_descr[target_cpu].address, 0);
+		free_per_cpu_area(target_cpu);
+        }
+
+        return 0;
 }

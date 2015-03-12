@@ -18,21 +18,56 @@ struct timer_queue {
 
 static DEFINE_PER_CPU(struct timer_queue, timer_queue);
 
-int
-timer_subsys_init(void)
-{
-	id_t cpu;
-	struct timer_queue *timerq;
+/* Don't ask for timers shorter than 10 microseconds */
+#define MIN_TIMER_INTERVAL 10000 
 
-	for_each_cpu_mask(cpu, cpu_present_map) {
-		timerq = &per_cpu(timer_queue, cpu);
-		spin_lock_init(&timerq->lock);
-		list_head_init(&timerq->timer_list);
-	}
+static void
+interrupt_timer_init(void) {
+/* Oneshot timer is started by the scheduler. */
+#if defined(CONFIG_TIMER_PERIODIC)
+        arch_set_timer_freq(sched_hz);
+#endif
+}
+
+int
+core_timer_init(int cpu_id)
+{
+	struct timer_queue *timerq = &per_cpu(timer_queue, cpu_id);
+    
+	spin_lock_init(&timerq->lock);
+	list_head_init(&timerq->timer_list);
+	interrupt_timer_init();
 
 	return 0;
 }
 
+
+
+/** Set the timer interrupt to fire for the current head of
+ *  the per-CPU timer list.
+ */
+static void 
+set_timer_interrupt(void)
+{
+#ifdef CONFIG_TIMER_ONESHOT
+	struct timer_queue *timerq = &per_cpu(timer_queue, this_cpu);
+	if (!list_empty(&timerq->timer_list) ) {
+		const uint64_t now = get_time();
+		uint64_t diff;
+		struct timer *timer = 
+			list_entry( timerq->timer_list.next,
+				    struct timer, link );
+
+		if (timer->expires > (now + MIN_TIMER_INTERVAL)) {
+			diff = timer->expires - now;
+		} else {
+			diff = MIN_TIMER_INTERVAL;
+		}
+
+		arch_set_timer_oneshot(diff);
+	} 
+#endif 
+}
 
 void
 timer_add(struct timer *timer)
@@ -54,6 +89,8 @@ timer_add(struct timer *timer)
 			break;
 	}
 	list_add_tail(&timer->link, pos);
+
+	set_timer_interrupt();
 
 	spin_unlock_irqrestore(&timerq->lock, irqstate);
 }
@@ -84,8 +121,9 @@ timer_del(struct timer *timer)
 
 	/* Remove the timer, if it hasn't already expired */
 	if (!list_empty(&timer->link)) {
-		list_del(&timer->link);
+		list_del_init(&timer->link);
 		not_expired = 1;
+		set_timer_interrupt();
 	}
 
 	spin_unlock_irqrestore(&timerq->lock, irqstate);
@@ -117,6 +155,13 @@ timer_sleep_until(uint64_t when)
 
 	timer_add(&timer);
 
+	/* Set task to TASK_INTERRUPTIBLE state so it goes
+	 * to sleep and other task can be scheduled
+	 */
+
+	set_task_state(current, TASK_INTERRUPTIBLE);
+
+
 	/* Go to sleep */
 	schedule();
 
@@ -145,10 +190,9 @@ expire_timers(void)
 
 	while( !list_empty(&timerq->timer_list) )
 	{
-		struct timer *timer = list_entry(
-			timerq->timer_list.next,
-			struct timer,
-			link
+		struct timer *timer = 
+			list_entry( timerq->timer_list.next,
+			struct timer, link
 		);
 
 		if( timer->expires > now )
@@ -160,11 +204,14 @@ expire_timers(void)
 		/* Execute the timer's callback function.
 		 * Note that we have released the timerq->lock, so the
 		 * callback function is free to call timer_add(). */
-		timer->function( timer->data );
+		if (timer->function)
+			timer->function( timer->data );
 
 		/* Get the lock again on the list */
 		spin_lock_irqsave(&timerq->lock, irqstate);
 	}
+
+	set_timer_interrupt();
 
 	spin_unlock_irqrestore(&timerq->lock, irqstate);
 }

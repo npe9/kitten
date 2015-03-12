@@ -59,7 +59,7 @@ retry:
 
 /* user is responsible for freeing user tree memory */
 int
-aspace_get(char *buf, int len)
+aspace_get(char *buf, size_t len)
 {
 	int i;
 	struct user_aspace *ua;
@@ -71,9 +71,9 @@ aspace_get(char *buf, int len)
 	// there are thwo structure types.
 	// how do I allocate this?
 	len = 8192;
-	kernel_query(CTL_ASPACE, 1, buf, &len, NULL, NULL);
+	kernel_query(CTL_ASPACE, 1, (void*)buf, &len, NULL, 0);
 	t = (struct user_tree*)buf;
-	ur = (struct region*)(buf + sizeof(struct user_tree) + t->count*sizeof(struct user_aspace));
+	ur = (struct user_region*)(buf + sizeof(struct user_tree) + t->count*sizeof(struct user_aspace));
 	for(i = 0; i < t->count; i++){
 		ua = &t->aspaces[i];
 		ua->regions = ur;
@@ -83,3 +83,20 @@ aspace_get(char *buf, int len)
 }
 
 
+int 
+aspace_unmap_region(
+	id_t     id,
+	vaddr_t  start,
+	size_t   extent
+)
+{
+	int status;
+	
+	if ((status = aspace_unmap_pmem(id, start, extent)))
+		return status;
+	
+	if ((status = aspace_del_region(id, start, extent)))
+		return status;
+	
+	return 0;
+}

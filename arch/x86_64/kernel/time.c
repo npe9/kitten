@@ -68,36 +68,72 @@ pit_calibrate_tsc(void)
 }
 #endif
 
-#ifdef CONFIG_CRAY_XT
+#ifdef CONFIG_CRAY_GEMINI
+
+/*
+ * Gemini systems have an HPET but no PIT.
+ * We grab the CPU and TSC time stamp counter frequencies from MSRs,
+ * rather than trying to use the HPET to calibrate.
+ */
+#define HWCR_BIT_FID    24            /* right bit of FID field */
+#define FIDVID_STATUS_BIT_FID 0x0     /* location of current FID */
+#define MSR_COFVID_STATUS 0xc0010071  /* Family 0x10 CPU (cf. 31116 BKDG */
+#define MSR_PSTATE_0 0xc0010064
+#define COF(FID,DID) ((100 * ((FID) + 0x10)) / (1<<(DID)))
+#define GETFID(STATUS) ((STATUS) & 0x3f)
+#define GETDID(STATUS) (((STATUS) >> 6) & 0x3)
+
+/*
+ * Returns the TSC frequency that we trust Coldstart has set in MSR_PSTATE_0.
+ * For G34 processors, this may be different than the frequency in COFVID.
+ * For earlier Family 10 processors the TSC and CPU frequency will be
+ * the same.
+ */
+static unsigned long cray_fam10_calibrate_tsc(void)
+{
+	unsigned int lower, upper;
+	int MHz;
+
+	rdmsr(MSR_PSTATE_0, lower, upper);
+	MHz = COF(GETFID(lower),GETDID(lower));
+	return MHz;
+}
+
+static unsigned long cray_fam10_cofvid_status(void)
+{
+	unsigned int lower, upper;
+	int MHz;
+
+	rdmsr(MSR_COFVID_STATUS, lower, upper);
+	MHz = COF(GETFID(lower),GETDID(lower));
+	return MHz;
+}
+
 /**
- * The Cray XT platform does not have any real time clocks. Therefore,
- * we have to inspect various MSRs to determine the CPU frequency and
- * trust that it is accurate.
- *
  * Returns the detected CPU frequency in KHz.
- *
- * NOTE: This function should only be used on Cray XT3/XT4/XT? platforms.
- *       While it will work on (some) AMD Opteron K8 and K10 systems, using a
- *       timer based mechanism to detect the actual CPU frequency is preferred.
  */
 static unsigned int __init
-crayxt_detect_cpu_freq(void)
+cray_detect_cpu_freq(void)
 {
 	unsigned int MHz = 200;
 	unsigned int lower, upper;
 	int amd_family = cpu_info[this_cpu].arch.x86_family;
 	int amd_model  = cpu_info[this_cpu].arch.x86_model;
 
-	if (amd_family == 16) {
-		unsigned int fid; /* current frequency id */
-		unsigned int did; /* current divide id */
-
-		rdmsr(MSR_K10_COFVID_STATUS, lower, upper);
-		fid = lower & 0x3f;
-		did = (lower >> 6) & 0x3f;
-		MHz = 100 * (fid + 0x10) / (1 << did);
-
-	} else if (amd_family == 15) {
+	if (amd_family == 0x15) {
+		/*
+		 * Family15 (Orochi) processors use the
+		 * same calculation as fam10.  However,
+		 * CPB configuration affects which PState
+		 * is "s/w P0", therefore read the cofvid
+		 * status which will be s/w Pstate 0 if
+		 * Coldstart setups up, but doesn't enable
+		 * CPB.
+		 */
+		MHz = cray_fam10_cofvid_status();
+	} else if (amd_family == 0x10) {
+		MHz = cray_fam10_calibrate_tsc();
+	} else if (amd_family == 0xf) {
 		unsigned int fid; /* current frequency id */
 
 		if (amd_model < 16) {
@@ -142,6 +178,31 @@ crayxt_detect_cpu_freq(void)
 }
 #endif
 
+#ifdef CONFIG_PISCES
+
+#include <arch/pisces/pisces_boot_params.h>
+
+extern struct pisces_boot_params * pisces_boot_params;
+
+static unsigned int __init
+pisces_detect_cpu_freq(void)
+{    
+    return pisces_boot_params->cpu_khz;
+}
+
+
+#endif
+
+void 
+arch_set_timer_freq(unsigned int hz){
+	lapic_set_timer_freq(hz);
+}
+
+void 
+arch_set_timer_oneshot(unsigned int nsec){
+	lapic_set_timer_oneshot(nsec);
+}
+
 void __init
 time_init(void)
 {
@@ -151,16 +212,22 @@ time_init(void)
 	/*
 	 * Detect the CPU frequency
 	 */
-#if defined CONFIG_PC
+#if defined CONFIG_PC 
 	cpu_khz = pit_calibrate_tsc();
 	pit_stop_timer0();
-#elif defined CONFIG_CRAY_XT
-	cpu_khz = crayxt_detect_cpu_freq();
+#elif defined CONFIG_CRAY_GEMINI
+	cpu_khz = cray_detect_cpu_freq();
+#elif defined CONFIG_PISCES
+	cpu_khz = pisces_detect_cpu_freq();
 #else
 	#error "In time_init(), unknown system architecture."
 #endif
 
 	struct arch_cpuinfo * const arch_info = &cpu_info[this_cpu].arch;
+
+	/* TODO: Fix this -- we're currently assuming that cpu_khz
+	 *       is the same as the tsc_khz, and that cpu_khz never
+	 *       changes. */
 	arch_info->cur_cpu_khz = cpu_khz;
 	arch_info->max_cpu_khz = cpu_khz;
 	arch_info->min_cpu_khz = cpu_khz;

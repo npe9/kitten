@@ -149,8 +149,6 @@ static void kobject_init_internal(struct kobject *kobj)
 	kref_init(&kobj->kref);
 	INIT_LIST_HEAD(&kobj->entry);
 	kobj->state_in_sysfs = 0;
-	kobj->state_add_uevent_sent = 0;
-	kobj->state_remove_uevent_sent = 0;
 	kobj->state_initialized = 1;
 }
 
@@ -235,9 +233,7 @@ static int kobject_set_name_vargs(struct kobject *kobj, const char *fmt,
  * @kobj: struct kobject to set the name of
  * @fmt: format string used to build the name
  *
- * This sets the name of the kobject.  If you have already added the
- * kobject to the system, you must call kobject_rename() in order to
- * change the name of the kobject.
+ * This sets the name of the kobject.  
  */
 int kobject_set_name(struct kobject *kobj, const char *fmt, ...)
 {
@@ -327,10 +323,6 @@ static int kobject_add_varg(struct kobject *kobj, struct kobject *parent,
  * Under no instance should the kobject that is passed to this function
  * be directly freed with a call to kfree(), that can leak memory.
  *
- * Note, no "add" uevent will be created with this call, the caller should set
- * up all of the necessary sysfs files for the object and then call
- * kobject_uevent() with the UEVENT_ADD parameter to ensure that
- * userspace is properly notified of this kobject's creation.
  */
 int kobject_add(struct kobject *kobj, struct kobject *parent,
 		const char *fmt, ...)
@@ -383,72 +375,7 @@ int kobject_init_and_add(struct kobject *kobj, struct kobj_type *ktype,
 }
 EXPORT_SYMBOL_GPL(kobject_init_and_add);
 
-/**
- * kobject_rename - change the name of an object
- * @kobj: object in question.
- * @new_name: object's new name
- *
- * It is the responsibility of the caller to provide mutual
- * exclusion between two different calls of kobject_rename
- * on the same kobject and to ensure that new_name is valid and
- * won't conflict with other kobjects.
- */
-int kobject_rename(struct kobject *kobj, const char *new_name)
-{
-	int error = 0;
-	const char *devpath = NULL;
-	const char *dup_name = NULL, *name;
-	char *devpath_string = NULL;
-	char *envp[2];
 
-	kobj = kobject_get(kobj);
-	if (!kobj)
-		return -EINVAL;
-	if (!kobj->parent)
-		return -EINVAL;
-
-	devpath = kobject_get_path(kobj, GFP_KERNEL);
-	if (!devpath) {
-		error = -ENOMEM;
-		goto out;
-	}
-	devpath_string = kmalloc(strlen(devpath) + 15, GFP_KERNEL);
-	if (!devpath_string) {
-		error = -ENOMEM;
-		goto out;
-	}
-	sprintf(devpath_string, "DEVPATH_OLD=%s", devpath);
-	envp[0] = devpath_string;
-	envp[1] = NULL;
-
-	name = dup_name = kstrdup(new_name, GFP_KERNEL);
-	if (!name) {
-		error = -ENOMEM;
-		goto out;
-	}
-
-	error = sysfs_rename_dir(kobj, new_name);
-	if (error)
-		goto out;
-
-	/* Install the new kobject name */
-	dup_name = kobj->name;
-	kobj->name = name;
-
-	/* This function is mostly/only used for network interface.
-	 * Some hotplug package track interfaces by their name and
-	 * therefore want to know when the name is changed by the user. */
-	kobject_uevent_env(kobj, KOBJ_MOVE, envp);
-
-out:
-	kfree(dup_name);
-	kfree(devpath_string);
-	kfree(devpath);
-	kobject_put(kobj);
-
-	return error;
-}
-EXPORT_SYMBOL_GPL(kobject_rename);
 
 /**
  * kobject_move - move object to another parent
@@ -461,7 +388,6 @@ int kobject_move(struct kobject *kobj, struct kobject *new_parent)
 	struct kobject *old_parent;
 	const char *devpath = NULL;
 	char *devpath_string = NULL;
-	char *envp[2];
 
 	kobj = kobject_get(kobj);
 	if (!kobj)
@@ -483,8 +409,7 @@ int kobject_move(struct kobject *kobj, struct kobject *new_parent)
 		goto out;
 	}
 	sprintf(devpath_string, "DEVPATH_OLD=%s", devpath);
-	envp[0] = devpath_string;
-	envp[1] = NULL;
+
 	error = sysfs_move_dir(kobj, new_parent);
 	if (error)
 		goto out;
@@ -492,7 +417,6 @@ int kobject_move(struct kobject *kobj, struct kobject *new_parent)
 	kobj->parent = new_parent;
 	new_parent = NULL;
 	kobject_put(old_parent);
-	kobject_uevent_env(kobj, KOBJ_MOVE, envp);
 out:
 	kobject_put(new_parent);
 	kobject_put(kobj);
@@ -545,12 +469,6 @@ static void kobject_cleanup(struct kobject *kobj)
 			 "function, it is broken and must be fixed.\n",
 			 kobject_name(kobj), kobj);
 
-	/* send "remove" if the caller did not do it but sent "add" */
-	if (kobj->state_add_uevent_sent && !kobj->state_remove_uevent_sent) {
-		pr_debug("kobject: '%s' (%p): auto cleanup 'remove' event\n",
-			 kobject_name(kobj), kobj);
-		kobject_uevent(kobj, KOBJ_REMOVE);
-	}
 
 	/* remove from sysfs if the caller did not do it */
 	if (kobj->state_in_sysfs) {
@@ -717,7 +635,6 @@ int kset_register(struct kset *k)
 	err = kobject_add_internal(&k->kobj);
 	if (err)
 		return err;
-	kobject_uevent(&k->kobj, KOBJ_ADD);
 	return 0;
 }
 
@@ -774,7 +691,7 @@ static struct kobj_type kset_ktype = {
  * kset_create - create a struct kset dynamically
  *
  * @name: the name for the kset
- * @uevent_ops: a struct kset_uevent_ops for the kset
+ * @unused: Unused variable for linux compatibility
  * @parent_kobj: the parent kobject of this kset, if any.
  *
  * This function creates a kset structure dynamically.  This structure can
@@ -786,7 +703,7 @@ static struct kobj_type kset_ktype = {
  * If the kset was not able to be created, NULL will be returned.
  */
 static struct kset *kset_create(const char *name,
-				struct kset_uevent_ops *uevent_ops,
+				void * unused, 
 				struct kobject *parent_kobj)
 {
 	struct kset *kset;
@@ -795,7 +712,6 @@ static struct kset *kset_create(const char *name,
 	if (!kset)
 		return NULL;
 	kobject_set_name(&kset->kobj, "%s", name);
-	kset->uevent_ops = uevent_ops;
 	kset->kobj.parent = parent_kobj;
 
 	/*
@@ -813,7 +729,7 @@ static struct kset *kset_create(const char *name,
  * kset_create_and_add - create a struct kset dynamically and add it to sysfs
  *
  * @name: the name for the kset
- * @uevent_ops: a struct kset_uevent_ops for the kset
+ * @unused: trash variable for Linux compatibility
  * @parent_kobj: the parent kobject of this kset, if any.
  *
  * This function creates a kset structure dynamically and registers it
@@ -824,13 +740,13 @@ static struct kset *kset_create(const char *name,
  * If the kset was not able to be created, NULL will be returned.
  */
 struct kset *kset_create_and_add(const char *name,
-				 struct kset_uevent_ops *uevent_ops,
+				 void * unused, 
 				 struct kobject *parent_kobj)
 {
 	struct kset *kset;
 	int error;
 
-	kset = kset_create(name, uevent_ops, parent_kobj);
+	kset = kset_create(name, NULL, parent_kobj);
 	if (!kset)
 		return NULL;
 	error = kset_register(kset);

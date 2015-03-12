@@ -142,9 +142,6 @@ static int
 lookup_and_lock_two(id_t a, id_t b,
                     struct aspace **aspace_a, struct aspace **aspace_b)
 {
-	int i;
-
-	i = 0;
 	/* As a convenience, handle case where a and b are the same */
 	if (a == b) {
 		if ((*aspace_a = lookup_and_lock(a)) == NULL)
@@ -429,6 +426,28 @@ aspace_acquire(id_t id)
 	local_irq_restore(irqstate);
 	return aspace;
 }
+
+
+int 
+aspace_update_cpumask(id_t id, cpumask_t * cpu_mask) 
+{
+	struct aspace *aspace;
+	unsigned long irqstate;
+	int ret = 0;
+
+	local_irq_save(irqstate);
+	if ((aspace = lookup_and_lock(id)) != NULL) {
+		aspace->cpu_mask = *cpu_mask;
+		aspace->next_cpu_id = first_cpu(aspace->cpu_mask);
+		spin_unlock(&aspace->lock);
+	} else {
+	    ret = -1;
+	}
+	local_irq_restore(irqstate);
+
+	return ret;
+}
+
 
 /**
  * Releases an aspace object that was previously acquired via aspace_acquire().
@@ -721,7 +740,7 @@ aspace_map_pmem(id_t id, paddr_t pmem, vaddr_t start, size_t extent)
 	struct aspace *aspace;
 	unsigned long irqstate;
 	
-	printk("mapping pmem pmem %llx start %llx extent %llx\n", pmem, start, extent);
+	printk(KERN_DEBUG "mapping pmem pmem %lx start %lx extent %lx\n", pmem, start, extent);
 	local_irq_save(irqstate);
 	aspace = lookup_and_lock(id);
 	status = __aspace_map_pmem(aspace, pmem, start, extent);
@@ -940,6 +959,53 @@ aspace_virt_to_phys(id_t id, vaddr_t vaddr, paddr_t *paddr)
 	return status;
 }
 
+
+int 
+__aspace_lookup_mapping(struct aspace *aspace, vaddr_t vaddr, aspace_mapping_t *mapping)
+{
+	struct region * rgn;
+
+	if (!aspace) {
+		return -EINVAL;
+	}
+	
+	rgn = find_region(aspace, vaddr);
+	if (!rgn) {
+		printk(KERN_WARNING
+		       "Failed to find region covering addr=0x%lx.\n",
+		       vaddr);
+		return -EINVAL;
+	}
+	
+
+	mapping->start = rgn->start;
+	mapping->end = rgn->end;
+	mapping->flags = rgn->flags;
+
+	return __aspace_virt_to_phys(aspace, mapping->start, &(mapping->paddr));
+}
+
+int 
+aspace_lookup_mapping(id_t id, vaddr_t vaddr, aspace_mapping_t *mapping)
+{
+	int status;
+	struct aspace * aspace;
+	unsigned long irqstate;
+
+	if (id == MY_ID) {
+		id = current->aspace->id;
+	}
+
+	local_irq_save(irqstate);
+	aspace = lookup_and_lock(id);
+	status = __aspace_lookup_mapping(aspace, vaddr, mapping);
+	if (aspace) spin_unlock(&aspace->lock);
+	local_irq_restore(irqstate);
+
+	return status;
+}
+
+
 int
 aspace_wait4_child_exit(id_t child_id, bool block, id_t *exit_id, int *exit_status)
 {
@@ -1047,7 +1113,7 @@ end:
  *
  */
 int
-aspace_map_pmem_backed(id_t id, paddr_t pmem, vaddr_t start, size_t extent, void *as_private_data, struct aspace_operations *as_ops)
+aspace_map_pmem_backed(id_t id, paddr_t pmem, vaddr_t start, size_t extent, void *as_private_data, struct aspace_operations_struct *as_ops)
 {
 	int status;
 	struct aspace *aspace;
@@ -1133,20 +1199,14 @@ aspace_set_region(id_t id, vaddr_t vaddr, size_t extent, bkflags_t type)
 	paddr_t paddr;
 	int status;
 
-	int i;
-
 	local_irq_save(irqstate);
 
 	if (id == MY_ID)
-		id = current->aspace->id;
-//	i = 0;
-	printk(KERN_WARNING "setting region vaddr %p\n", vaddr);
-	printk(KERN_WARNING "%d", i++);
+	  id = current->aspace->id;
 	if ((aspace = lookup_and_lock(id)) == NULL) {
 		local_irq_restore(irqstate);
 		return -EINVAL;
 	}
-//	printk(KERN_WARNING "%d", i++);
 
 	switch(type) {
 	case BK_ARENA:
@@ -1154,7 +1214,7 @@ aspace_set_region(id_t id, vaddr_t vaddr, size_t extent, bkflags_t type)
 			printk(KERN_WARNING "failed status: %d\n", status);
 			return status;
 		}
-		printk(KERN_DEBUG "mapping pmem vaddr %llx paddr %llx\n", vaddr, paddr);
+		printk(KERN_DEBUG "mapping pmem vaddr %lx paddr %lx\n", vaddr, paddr);
 		// so what do I need? I need a particular region.
 {
 	static int times;
@@ -1185,8 +1245,6 @@ aspace_sync_region(id_t id, vaddr_t vaddr, size_t extent)
 {
 	struct aspace *aspace;
 	unsigned long irqstate;
-	paddr_t paddr;
-	int status;
 
 	local_irq_save(irqstate);
 
@@ -1210,8 +1268,6 @@ int
 __aspace_copy(struct aspace *src, struct aspace *dst, int flags)
 {
 	struct region *srgn, *drgn;
-	struct list_head *pos;
-	size_t extent;
 
 //	printk(KERN_DEBUG "Copying aspace %d %d\n", src->id, dst->id);
 
@@ -1288,7 +1344,6 @@ int
 aspace_copy(id_t src, id_t *dst, int flags)
 {
 	int status;
-	id_t new_id;
 	struct aspace *src_spc, *dst_spc;
 	unsigned long irqstate;
 
@@ -1310,7 +1365,7 @@ aspace_copy(id_t src, id_t *dst, int flags)
 	status = __aspace_copy(src_spc, dst_spc, flags);
 
 	spin_unlock(&src_spc->lock);
-	if (src != dst)
+	if (src != *dst)
 		spin_unlock(&dst_spc->lock);
 
 	local_irq_restore(irqstate);
@@ -1351,13 +1406,13 @@ exit:
 }
 
 int
-aspace_enum(char **buf, int *len)
+aspace_enum(void **buf, size_t *len)
 {
 	struct aspace *a;
 	struct region *rgn;
 	spin_lock(&htable_lock);
 	int naspace, nregion;
-	char *p, *e;
+	char *p;
 	struct user_tree *t;
 	struct user_aspace *ua;
 	struct user_region *ur;

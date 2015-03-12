@@ -204,6 +204,28 @@ pcicfg_read_extcap(
 			hdr->pcix.status  = RREG( ptr + PCIXR_STATUS,  4 );
 			break;
 
+                case PCIY_MSI:
+                        hdr->msi.valid = true;
+                        hdr->msi.msi_location = ptr;
+                        hdr->msi.msi_ctrl = RREG(ptr + PCIR_MSI_CTRL, 2);
+                        hdr->msi.msi_msgnum = 
+                            1 << ((hdr->msi.msi_ctrl & PCIM_MSICTRL_MMC_MASK) >> 1);
+
+                        /*
+                        printk("MSI supports %d message%s%s%s \n", hdr->msi.msi_msgnum,
+                                (hdr->msi.msi_msgnum == 1) ? "" : "s",
+                                (hdr->msi.msi_ctrl & PCIM_MSICTRL_64BIT) ? ", 64 bit" : "",
+                                (hdr->msi.msi_ctrl & PCIM_MSICTRL_VECTOR) ? ", vector masks" : "");
+                                */
+
+                        if (hdr->msi.msi_ctrl & PCIM_MSICTRL_MSI_ENABLE) {
+                            /*
+                            printk("Warning: MSI already enabled!!\n");
+                            */
+                        }
+
+                        break;
+
 		/* Extended Message Signaled Interrupt (MSI-X) */
 		case PCIY_MSIX:	
 			hdr->msix.valid             = true;
@@ -213,11 +235,11 @@ pcicfg_read_extcap(
 			                                  PCIM_MSIXCTRL_TABLE_SIZE) + 1;
 
 			val = RREG( ptr + PCIR_MSIX_TABLE, 4 );
-			hdr->msix.msix_table_bar    = PCIR_BAR(val & PCIM_MSIX_BIR_MASK);
+			hdr->msix.msix_table_bar    = val & PCIM_MSIX_BIR_MASK;
 			hdr->msix.msix_table_offset = val & ~PCIM_MSIX_BIR_MASK;
 
 			val = RREG( ptr + PCIR_MSIX_PBA, 4 );
-			hdr->msix.msix_pba_bar      = PCIR_BAR(val & PCIM_MSIX_BIR_MASK);
+			hdr->msix.msix_pba_bar      = val & PCIM_MSIX_BIR_MASK;
 			hdr->msix.msix_pba_offset   = val & ~PCIM_MSIX_BIR_MASK;
 
 			break;
@@ -269,6 +291,7 @@ pcicfg_hdr_read(
 	hdr->bar[3]		= RREG( PCIR_BAR(3),    4 );
 	hdr->bar[4]		= RREG( PCIR_BAR(4),    4 );
 	hdr->bar[5]		= RREG( PCIR_BAR(5),    4 );
+	hdr->bios		= RREG( PCIR_BIOS,      4 );
 
 	hdr->is_multi_func	= (hdr->hdr_type & PCIM_MFDEV);
 	hdr->hdr_type		&= ~PCIM_MFDEV;
@@ -396,6 +419,8 @@ pcicfg_bar_decode(
 	uint8_t type = 0;
 	uint8_t prefetch = 0;
 	uint64_t address;
+	uint64_t mask = 0;
+	uint64_t size = 0;
 
 	bar1 = hdr->bar[index];
 
@@ -413,14 +438,46 @@ pcicfg_bar_decode(
 			bar2 = hdr->bar[index + 1];
 			address |= ((uint64_t)bar2 << 32);
 		}
+			
+
+		/* Detect BAR size */
+		/* We are going to assume that no BAR is larger than 4GB, so we 
+		 *  only need to check the lower 32 bits
+		 */
+		pcicfg_write(hdr->bus, hdr->slot, hdr->func, 
+			     PCIR_BAR(index), 4, 0xffffffff);
+		
+		mask = pcicfg_read(hdr->bus, hdr->slot, hdr->func,
+				   PCIR_BAR(index), 4);
+		mask &= 0xfffffff0;
+		
+		size = ((uint32_t)~mask) + 1;
+
+		pcicfg_write(hdr->bus, hdr->slot, hdr->func, 
+			     PCIR_BAR(index), 4, (uint32_t)address);
+
 	} else {
 		// I/O BAR, only address is defined
 		address  = (bar1 & 0xFFFFFFFC);
+
+		/* Detect BAR size */
+		pcicfg_write(hdr->bus, hdr->slot, hdr->func, 
+			     PCIR_BAR(index), 4, 0xffffffff);
+		
+		mask = pcicfg_read(hdr->bus, hdr->slot, hdr->func,
+				   PCIR_BAR(index), 4);
+
+		mask &= 0xfffc;
+		size = ((uint16_t)~mask) + 1;
+
+		pcicfg_write(hdr->bus, hdr->slot, hdr->func, 
+			     PCIR_BAR(index), 4, (uint32_t)address);		
 	}
 
 	if (bar) {
 		bar->index    = (uint8_t) index;
 		bar->address  = address;
+		bar->size     = size;
 		bar->mem      = mem;
 		bar->type     = type;
 		bar->prefetch = prefetch;
@@ -429,6 +486,40 @@ pcicfg_bar_decode(
 	return 0;
 }
 
+
+/* Decodes Expansion ROM bar, stores result in bar output. */
+int
+pcicfg_exp_rom_decode(
+	pcicfg_hdr_t * hdr,
+	pci_exp_rom_bar_t * bar
+) {
+        uint32_t exp_rom = 0;
+        uint64_t mask = 0;
+        uint64_t size = 0;
+
+        exp_rom = hdr->bios;
+
+        pcicfg_write(hdr->bus, hdr->slot, hdr->func, 
+                PCIR_BIOS, 4, 0xffffffff & PCIM_BIOS_ADDR_MASK);
+
+        mask = pcicfg_read(hdr->bus, hdr->slot, hdr->func,
+                PCIR_BIOS, 4);
+
+        mask &= PCIM_BIOS_ADDR_MASK;
+
+        size = ((uint32_t)~mask) + 1;
+
+        pcicfg_write(hdr->bus, hdr->slot, hdr->func, 
+                PCIR_BIOS, 4, (uint32_t)exp_rom);
+
+        if (bar) {
+                bar->address  = exp_rom & PCIM_BIOS_ADDR_MASK;
+                bar->size     = size;
+                bar->enable     = exp_rom & PCIM_BIOS_ENABLE;
+        }
+
+        return 0;
+}
 
 #undef RCFG
 #undef WCFG

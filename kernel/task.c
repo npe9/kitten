@@ -8,6 +8,9 @@
 #include <lwk/sched.h>
 #include <lwk/smp.h>
 
+#ifdef CONFIG_SCHED_EDF
+#include <lwk/sched_edf.h>
+#endif
 
 // Caller must have aspace->lock locked
 static bool
@@ -120,8 +123,44 @@ __task_create(
 		goto fail_cpu_id_alloc;
 	tsk->cpu_target_id = tsk->cpu_id;
 
+#ifdef CONFIG_SCHED_EDF
+
+	if(start_state->edf.period){
+		tsk->edf.period = start_state->edf.period;
+		tsk->edf.release_period = start_state->edf.period;
+	}else{
+		tsk->edf.period = 0;
+		tsk->edf.release_period = 0;
+	}
+
+	if(start_state->edf.slice){
+		tsk->edf.slice = start_state->edf.slice;
+		tsk->edf.release_slice = start_state->edf.slice;
+	}else{
+		tsk->edf.slice = 0;
+		tsk->edf.release_slice = 0;
+	}
+
+	list_head_init(&tsk->edf.sched_link);
+	tsk->edf.cpu_reservation = 0;
+	tsk->edf.curr_deadline = 0;
+	tsk->edf.used_time = 0;
+	tsk->edf.last_wakeup = 0;
+	tsk->edf.deadlines = 0;
+	tsk->edf.miss_deadlines = 0;
+	tsk->edf.print_miss_deadlines = 0;
+	tsk->edf.extra_time = false;
+#endif
+
+#ifdef CONFIG_TASK_MEAS
+	tsk->meas.start_time = 0;
+	tsk->meas.start_energy = 0;
+	tsk->meas.time = 0;
+	tsk->meas.energy = 0;
+#endif
+
 	// Fill in and initialize the rest of the task structure
-	tsk->state	=	TASK_RUNNING;
+	tsk->state	=	TASK_STOPPED;
 	tsk->uid	=	start_state->user_id;
 	tsk->gid	=	start_state->group_id;
 	tsk->aspace	=	aspace;
@@ -129,7 +168,8 @@ __task_create(
 	tsk->fdTable	=	NULL;
 	strlcpy(tsk->name, start_state->task_name, sizeof(tsk->name));
 	list_head_init(&tsk->aspace_link);
-	list_head_init(&tsk->sched_link);
+	list_head_init(&tsk->migrate_link);
+	list_head_init(&tsk->rr.sched_link);
 	list_head_init(&tsk->sigpending.list);
 	
 
@@ -185,7 +225,7 @@ task_create(
 		return -EINVAL;
 
 	// Add the new task to the target CPU's run queue
-	sched_add_task(tsk);
+	sched_wakeup_task(tsk, TASK_STOPPED);
 
 	if (task_id)
 		*task_id = tsk->id;

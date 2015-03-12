@@ -25,14 +25,8 @@ __SYSCALL(__NR_stat, sys_stat)
 __SYSCALL(__NR_fstat, sys_fstat)
 #define __NR_lstat                               6
 __SYSCALL(__NR_lstat, syscall_not_implemented)
-
 #define __NR_poll                                7
-#ifdef CONFIG_LINUX
 __SYSCALL(__NR_poll, sys_poll)
-#else
-__SYSCALL(__NR_poll, syscall_not_implemented)
-#endif
-
 #define __NR_lseek                               8
 __SYSCALL(__NR_lseek, sys_lseek)
 #define __NR_mmap                                9
@@ -61,7 +55,7 @@ __SYSCALL(__NR_readv, sys_readv)
 #define __NR_writev                             20
 __SYSCALL(__NR_writev, sys_writev)
 #define __NR_access                             21
-__SYSCALL(__NR_access, syscall_not_implemented)
+__SYSCALL(__NR_access, sys_access)
 #define __NR_pipe                               22
 __SYSCALL(__NR_pipe, sys_pipe)
 #define __NR_select                             23
@@ -706,17 +700,35 @@ __SYSCALL(__NR_lwk_ifconfig, sys_lwk_ifconfig)
 #else
 __SYSCALL(__NR_lwk_ifconfig, syscall_not_implemented)
 #endif
+#define __NR_phys_cpu_add	525
+__SYSCALL(__NR_phys_cpu_add, sys_phys_cpu_add)
+#define __NR_phys_cpu_remove	526
+__SYSCALL(__NR_phys_cpu_remove, sys_phys_cpu_remove)
 
-#define __NR_aspace_set_region       525
-__SYSCALL(__NR_aspace_set_region, sys_aspace_set_region)
+#define __NR_task_meas		527
+#ifdef CONFIG_TASK_MEAS
+__SYSCALL(__NR_task_meas, sys_task_meas)
+#endif
 
-#define __NR_aspace_sync_region       526
-__SYSCALL(__NR_aspace_sync_region, sys_aspace_sync_region)
-
-#define __NR_aspace_copy      527
-__SYSCALL(__NR_aspace_copy, sys_aspace_copy)
-
-#define __NR_kernel_query      528
-__SYSCALL(__NR_kernel_query, sys_kernel_query)
+#define __NR_aspace_update_user_cpumask     528
+__SYSCALL(__NR_aspace_update_user_cpumask, sys_aspace_update_user_cpumask)
 
 #endif
+
+#define __NR_sched_yield_task_to        529
+__SYSCALL(__NR_sched_yield_task_to, sys_sched_yield_task_to)
+
+
+#define __NR_aspace_set_region       530
+__SYSCALL(__NR_aspace_set_region, sys_aspace_set_region)
+
+#define __NR_aspace_sync_region       531
+__SYSCALL(__NR_aspace_sync_region, sys_aspace_sync_region)
+
+#define __NR_aspace_copy      532
+__SYSCALL(__NR_aspace_copy, sys_aspace_copy)
+
+#define __NR_kernel_query      533
+__SYSCALL(__NR_kernel_query, sys_kernel_query)
+
+

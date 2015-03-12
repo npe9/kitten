@@ -190,6 +190,7 @@ SYSCALL4(aspace_smartmap, id_t, id_t, vaddr_t, size_t);
 SYSCALL2(aspace_unsmartmap, id_t, id_t);
 SYSCALL3(aspace_virt_to_phys, id_t, vaddr_t, paddr_t *);
 SYSCALL1(aspace_dump2console, id_t);
+SYSCALL2(aspace_update_user_cpumask, id_t, user_cpumask_t *);
 
 SYSCALL4(aspace_set_region, id_t, vaddr_t, size_t, bkflags_t);
 SYSCALL3(aspace_sync_region, id_t, vaddr_t, size_t);
@@ -199,6 +200,7 @@ SYSCALL3(aspace_copy, id_t, id_t *, int);
  * Task management.
  */
 SYSCALL2(task_create, const start_state_t *, id_t *);
+SYSCALL5(task_meas, id_t, id_t, uint64_t *, uint64_t *, uint64_t *);
 SYSCALL1(task_switch_cpus, id_t);
 
 /**
@@ -213,6 +215,13 @@ SYSCALL1(lwk_ifconfig, struct lwk_ifreq *);
 SYSCALL2(elf_hwcap, id_t, uint32_t *);
 
 /**
+ * CPU Management system calls
+ */
+SYSCALL2(phys_cpu_add, id_t, id_t);
+SYSCALL2(phys_cpu_remove, id_t, id_t);
+
+
+/**
  * Palacios hypervisor control system calls.
  */
 SYSCALL2(v3_start_guest, vaddr_t, size_t);
@@ -221,5 +230,9 @@ SYSCALL2(v3_start_guest, vaddr_t, size_t);
  * Query kernel for state
  */
 
-SYSCALL6(kernel_query, int *, int, void *, size_t, void *, size_t);
+SYSCALL6(kernel_query, int, size_t, void **, size_t *, void *, size_t);
 
+/*
+ * Scheduling control system calls.
+ */
+SYSCALL2(sched_yield_task_to, int, int);

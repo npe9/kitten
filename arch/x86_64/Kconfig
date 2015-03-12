@@ -41,10 +41,16 @@ config PC
         help
 	  Support for standard PC compatible systems.
 
-config CRAY_XT
-        bool "Red Storm (Cray XT3/XT4)"
-         help
-	  Support for Cray XT3 and XT4 systems.
+config CRAY_GEMINI
+	bool "Cray XE and XK systems"
+	help
+	  Support for Cray XE and XK systems.
+	  These systems use the Cray Gemini interconnect.
+
+config PISCES
+	bool "Multi-instance environment"
+	help 
+	  Support for running Kitten as a multi-instance enclave
 
 endchoice
 
@@ -83,7 +89,75 @@ config GENERIC_CPU
 
 endchoice
 
+choice
+	prompt "Timer Interrupt Strategy"
+	default TIMER_PERIODIC
 
+config TIMER_PERIODIC
+	bool "Periodic timer interrupts"
+	help
+	  Use a periodic interrupt at SCHED_HZ to drive timer
+	  expiration and scheduling in Kitten.
+
+config TIMER_ONESHOT
+	bool "One-shot timer interrupts"
+	help
+	  Uses one-shot timers to drive scheduling in kitten. Results
+	  in more accurate scheduling, particularly with EDF scheduling,
+	  but can result in higher overheads if fine-grained scheduling
+	  or timers are requested.
+
+endchoice
+
+config TASK_MEAS
+	bool "Kitten Task Based Power Measurements"
+	help
+	  Periodic updates of task power and energy used
+choice
+	prompt "Task Based Power Measurement Method"
+	default TASK_MEAS_INTEL_IVY_MSR
+
+config TASK_MEAS_INTEL_SANDY_MSR
+	bool "Timer Based Intel Sandy MSR Support"
+	depends on TASK_MEAS
+	help
+	Timer based Intel Sandy MSR task updates
+
+config TASK_MEAS_INTEL_IVY_MSR
+	bool "Timer Based Intel Ivy MSR Support"
+	depends on TASK_MEAS
+	help
+	Timer based Intel Ivy MSR task updates
+
+endchoice
+
+config SCHED_EDF
+	bool "Kitten Earliest Deadline First (EDF)"
+	help
+	  A real time EDF scheduler is used.
+choice
+depends on SCHED_EDF
+	prompt "EDF Scheduler version"
+	default SCHED_EDF_NWC
+
+config SCHED_EDF_NWC
+	bool "Non-Work-Conserving EDF Scheduler"
+	depends on SCHED_EDF
+	help
+	Non-Work-Conserving version of EDF is used
+
+config SCHED_EDF_WC
+	bool "Work Conserving EDF Scheduler"
+	depends on SCHED_EDF
+	help
+	Work-Conserving version of EDF is used
+
+config  SCHED_EDF_RR
+        bool "NWC EDF + Round Robin when CPU is idle"
+	depends on SCHED_EDF
+        help
+        Round Robin is used after all tasks have consumed their slices within a period.
+endchoice
 
 #
 # Define implied options from the CPU selection
@@ -147,14 +221,37 @@ config PALACIOS
 	  Include the Palacios virtual machine monitor. This enables Kitten
 	  to run guest operating systems alongside native applications.
 
+
+choice
+	prompt "Internal/External Palacios library"
+	depends on PALACIOS
+	default PALACIOS_INT
+
+config PALACIOS_INTERNAL
+	bool "Link core Palacios library directly to Kitten interfaces"
+	help 
+		This is the old style linking mechanism that required 
+		internalized Palacios interfaces to be implemented 
+		inside Kitten
+
+config PALACIOS_EXTERNAL
+	bool "Link in Palacios as a self contained module"
+	select BLOCK_DEVICE
+	help 
+		New linking style that modularizes Palacios and requires
+		no Palacios interfaces to be included inside Kitten
+		
+endchoice
+ 
+
 config PALACIOS_SOCKET
         bool
-        depends on NETWORK && LWIP_TCP && LWIP_UDP && LWIP_SOCKET
+        depends on NETWORK && LWIP_TCP && LWIP_UDP && LWIP_SOCKET && PALACIOS_INTERNAL
         default "y"
 
 config PALACIOS_GDB
 	bool
-	depends on PALACIOS
+	depends on PALACIOS && PALACIOS_INTERNAL
 	default "y"
 
 config PALACIOS_PATH
@@ -166,9 +263,15 @@ config PALACIOS_PATH
 	  find Palacios include files and libraries that need to be
 	  linked with the Kitten kernel image.
 
+
+config BUILT_IN_GUEST_OS
+	depends on PALACIOS
+	bool "Compile Guest OS image into Kitten init_task"
+	
+
 config GUEST_OS_ISOIMAGE_PATH
 	string "Path to guest OS image"
-	depends on PALACIOS
+	depends on BUILT_IN_GUEST_OS
 	default "../guest_os/linux_guest.img"
 	help
 	  Path to a guest image to link with the example user/hello_world
@@ -198,6 +301,7 @@ config ACPI
 	default "y"
 
 source "net/Kconfig"
+source "block/Kconfig"
 source "drivers/Kconfig"
 source "arch/x86_64/boot/Kconfig"
 source "arch/x86_64/Kconfig.debug"

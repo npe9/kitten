@@ -41,11 +41,7 @@ static inline int pci_proc_domain(struct pci_bus *bus)
    already-configured bus numbers - to be used for buggy BIOSes
    or architectures with incomplete PCI setup by the loader */
 
-#ifdef CONFIG_PCI
 extern unsigned int pcibios_assign_all_busses(void);
-#else
-#define pcibios_assign_all_busses()	0
-#endif
 #define pcibios_scan_all_fns(a, b)	0
 
 extern unsigned long pci_mem_start;
@@ -58,7 +54,6 @@ void pcibios_config_init(void);
 struct pci_bus *pcibios_scan_root(int bus);
 
 void pcibios_set_master(struct pci_dev *dev);
-void pcibios_penalize_isa_irq(int irq, int active);
 struct irq_routing_table *pcibios_get_irq_routing_table(void);
 int pcibios_set_irq_routing(struct pci_dev *dev, int pin, int irq);
 
@@ -68,19 +63,6 @@ extern int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
 			       enum pci_mmap_state mmap_state,
 			       int write_combine);
 
-
-#ifdef CONFIG_PCI
-extern void early_quirks(void);
-static inline void pci_dma_burst_advice(struct pci_dev *pdev,
-					enum pci_dma_burst_strategy *strat,
-					unsigned long *strategy_parameter)
-{
-	*strat = PCI_DMA_BURST_INFINITY;
-	*strategy_parameter = ~0UL;
-}
-#else
-static inline void early_quirks(void) { }
-#endif
 
 #endif  /* __KERNEL__ */
 

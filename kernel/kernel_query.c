@@ -4,7 +4,7 @@
 
 int
 kernel_query(int name,
-		int nlen,
+		size_t nlen,
 		void **oldval,
 		size_t *oldlenp,
 		void *newval,
@@ -15,7 +15,7 @@ kernel_query(int name,
 	 * I want to be able to write things.
 	 *
 	 */
-	printk(KERN_WARNING "buf %p oldlenp %p %d\n", oldval, oldlenp, *oldlenp);
+	printk(KERN_WARNING "buf %p oldlenp %p %ld\n", oldval, oldlenp, *oldlenp);
 
 	printk(KERN_WARNING "entering kernel query %d\n", name);
 	switch(name) {
@@ -23,7 +23,7 @@ kernel_query(int name,
 		printk(KERN_WARNING "aspacing\n");
 		// so where do I find the aspaces?
 		aspace_enum(oldval, oldlenp);
-		printk(KERN_WARNING "aspace_enumed got oldval %p *oldval %p oldlenp %d\n", oldval, *oldval, *oldlenp);
+		printk(KERN_WARNING "aspace_enumed got oldval %p *oldval %p oldlenp %ld\n", oldval, *oldval, *oldlenp);
 		printk(KERN_WARNING "user tree count %d\n",
 				((struct user_tree*)oldval)->count);
 		break;
@@ -31,7 +31,7 @@ kernel_query(int name,
 		printk(KERN_WARNING "tasking\n");
 
 		// so where do I find the tasks?
-		task_enum(oldval, oldlenp);
+		//task_enum(oldval, oldlenp);
 		break;
 	default:
 		printk(KERN_WARNING "not found\n");

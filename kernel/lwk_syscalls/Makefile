@@ -18,7 +18,13 @@ obj-y := \
 	aspace_unsmartmap.o \
 	aspace_dump2console.o \
 	aspace_virt_to_phys.o \
+	aspace_update_user_cpumask.o \
 	task_create.o \
 	task_switch_cpus.o \
 	elf_hwcap.o \
 	kernel_query.o \
+	phys_cpu_add.o \
+	phys_cpu_remove.o \
+	sched_yield_task_to.o
+
+obj-$(CONFIG_TASK_MEAS) += task_meas.o

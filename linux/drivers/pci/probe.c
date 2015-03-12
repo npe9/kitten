@@ -9,7 +9,6 @@
 #include <linux/slab.h>
 #include <linux/module.h>
 #include <linux/cpumask.h>
-#include <linux/pci-aspm.h>
 #include "pci.h"
 
 #define CARDBUS_LATENCY_TIMER	176	/* secondary latency timer */
@@ -767,11 +766,7 @@ static int pci_setup_device(struct pci_dev * dev)
 	dev_dbg(&dev->dev, "found [%04x/%04x] class %06x header type %02x\n",
 		 dev->vendor, dev->device, class, dev->hdr_type);
 
-	/* "Unknown power state" */
-	dev->current_state = PCI_UNKNOWN;
 
-	/* Early fixups, before probing the BARs */
-	pci_fixup_device(pci_fixup_early, dev);
 	class = dev->class >> 8;
 
 	switch (dev->hdr_type) {		    /* header type */
@@ -1025,14 +1020,6 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
 	pci_set_dma_max_seg_size(dev, 65536);
 	pci_set_dma_seg_boundary(dev, 0xffffffff);
 
-	/* Fix up broken headers */
-	pci_fixup_device(pci_fixup_header, dev);
-
-	/* Buffers for saving PCIe and PCI-X capabilities */
-	pci_allocate_cap_save_buffers(dev);
-
-	/* Initialize power management of the device */
-	pci_pm_init(dev);
 
 	/*
 	 * Add the device to our list of discovered devices
@@ -1097,9 +1084,6 @@ int pci_scan_slot(struct pci_bus *bus, int devfn)
 		}
 	}
 
-	/* only one slot has pcie device */
-	if (bus->self && nr)
-		pcie_aspm_init_link_state(bus->self);
 
 	return nr;
 }
@@ -1233,12 +1217,6 @@ struct pci_bus * __devinit pci_scan_bus_parented(struct device *parent,
 }
 EXPORT_SYMBOL(pci_scan_bus_parented);
 
-#ifdef CONFIG_HOTPLUG
-EXPORT_SYMBOL(pci_add_new_bus);
-EXPORT_SYMBOL(pci_scan_slot);
-EXPORT_SYMBOL(pci_scan_bridge);
-EXPORT_SYMBOL_GPL(pci_scan_child_bus);
-#endif
 
 static int __init pci_sort_bf_cmp(const struct pci_dev *a, const struct pci_dev *b)
 {

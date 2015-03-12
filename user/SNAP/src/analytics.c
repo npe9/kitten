@@ -1,6 +1,7 @@
 #include <sys/types.h>
 #include <semaphore.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/mman.h>
 #include <sys/stat.h> 
 #include <fcntl.h>

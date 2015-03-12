@@ -7,7 +7,6 @@
 #include <lwk/idspace.h>
 #include <lwk/cpumask.h>
 
-
 // Setting start_state.entry_point to USE_PARENT_IP will cause the new task
 // to begin executing at the current value of the caller's instruction pointer. 
 #define USE_PARENT_IP		0
@@ -23,6 +22,12 @@ typedef struct {
 	id_t			aspace_id;	// Address space the task executes in
 	id_t			cpu_id;		// CPU ID the task starts executing on
 
+#ifdef CONFIG_SCHED_EDF
+	struct {
+		uint64_t                slice;          // EDF Sched slice
+		uint64_t                period;         // EDF Sched period
+	} edf;
+#endif
 	vaddr_t			stack_ptr;	// Ignored for kernel tasks
 	vaddr_t			entry_point;	// Instruction address to start executing at
 	vaddr_t			fs;		// fs register value, for thread local storage
@@ -45,6 +50,15 @@ task_switch_cpus(
 	id_t			cpu_id
 );
 
+extern int
+task_meas(
+	id_t aspace_id,
+	id_t task_id,
+	uint64_t *time,
+	uint64_t *energy,
+	uint64_t *unit_energy
+);
+
 // End core task management API
 
 
@@ -53,6 +67,7 @@ task_switch_cpus(
 #include <lwk/types.h>
 #include <lwk/init.h>
 #include <lwk/list.h>
+#include <lwk/rbtree.h>
 #include <lwk/seqlock.h>
 #include <lwk/idspace.h>
 #include <lwk/rlimit.h>
@@ -82,7 +97,7 @@ typedef unsigned int taskstate_t;
 
 // Some commonly used combinations of task states:
 #define TASK_NORMAL		(TASK_INTERRUPTIBLE | TASK_UNINTERRUPTIBLE)
-#define TASK_ALL		(TASK_NORMAL)
+#define TASK_ALL		(TASK_NORMAL | TASK_STOPPED)
 
 struct fdTable;
 
@@ -109,8 +124,6 @@ struct task_struct {
 	cpumask_t		cpu_mask;	// CPUs this task may migrate to
 	id_t			cpu_target_id;	// CPU this task should migrate to
 
-	struct list_head	sched_link;	// For per-CPU scheduling lists
-	bool			sched_irqs_on;	// IRQs on at schedule() entry?
 
 	int __user *		set_child_tid;	// CLONE_CHILD_SETTID
 	int __user *		clear_child_tid;// CLONE_CHILD_CLEARTID
@@ -122,10 +135,54 @@ struct task_struct {
 
 	struct arch_task	arch;		// arch specific task info
 	struct fdTable*		fdTable;
+	struct list_head	migrate_link;	// For per-CPU scheduling lists
+	struct task_rr {
+		struct list_head sched_link;
+	} rr;
+#ifdef CONFIG_SCHED_EDF
+        struct task_edf {
+		struct rb_node 	node;
+		struct rb_node	resched_node;
+		struct list_head sched_link;
+		uint64_t        release_period; // Period set during task creation
+		uint64_t        release_slice;  // Slice set during task creation
+		uint64_t        period;         // relase_slice and release_period are that same than slice and
+		uint64_t        slice;          // period except when this task inherit those values from other task
+		int 		cpu_reservation;
+		uint64_t	curr_deadline;
+		uint64_t	last_wakeup;
+		uint64_t	used_time;
+		uint64_t	deadlines;
+		uint64_t	miss_deadlines;
+		uint64_t	print_miss_deadlines;
+		int		extra_time;
+	} edf;       	// EDF Scheduler task structure
+#endif
 
+#ifdef CONFIG_TASK_MEAS
+	struct task_meas {
+		struct raplunits
+		{
+			uint64_t	time;
+			uint64_t	energy;
+			uint64_t	power;
+			u8 set;
+		} units;
+
+		uint64_t	start_time;
+		uint64_t	start_energy;
+		uint64_t	time;
+		uint64_t	energy;
+	} meas;		// measurement task structure
+#endif
+
+	bool			sched_irqs_on;	// IRQs on at schedule() entry?
 	// Stuff needed for the Linux compatibility layer
 	char *			comm;		// The task's name
 	struct aspace *		mm;		// Address space task is in
+
+	/* List of struct preempt_notifier */
+	struct hlist_head       preempt_notifiers;
 };
 
 
@@ -153,7 +210,14 @@ arch_task_create(
 // Syscall wrappers for task creation
 extern int sys_task_create(const start_state_t __user *start_state,
                            id_t __user *task_id);
+#ifdef CONFIG_TASK_MEAS
+extern void arch_task_meas_start(void);
+extern void arch_task_meas(void);
 
+// Syscall wrappers for task meas
+extern int sys_task_meas(id_t aspace_id, id_t task_id, uint64_t __user *time,
+                         uint64_t __user *energy, uint64_t __user *unit_energy);
+#endif
 
 extern int sys_task_switch_cpus(id_t cpu_id);
 

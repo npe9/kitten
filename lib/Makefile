@@ -4,6 +4,7 @@
 
 lib-y := \
 	vsprintf.o \
+	kasprintf.o \
 	string.o \
 	cpumask.o \
 	hweight.o \
@@ -13,6 +14,8 @@ lib-y := \
 	ctype.o \
 	idspace.o \
 	htable.o \
+	rbtree.o \
+	radix-tree.o \
 	mutex.o \
 	semaphore.o \
 	cmdline.o \

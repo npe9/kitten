@@ -73,7 +73,7 @@ int main( int argc, char **argv )
 	 * write to it,
 	 * watch kitten crash.
 	 */
-	aspace_create()
+	aspace_create();
 	/* Initialize each rank's data array to contain the rank's ID */
 	for (i=0; i<DATA_COUNT; i++)
 		data[i] = get_my_rank();

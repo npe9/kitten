@@ -12,7 +12,9 @@ pmem_type_to_string(pmem_type_t type)
 		case PMEM_TYPE_INIT_TASK:   return "INIT_TASK";   break;
 		case PMEM_TYPE_KMEM:        return "KMEM";        break;
 		case PMEM_TYPE_UMEM:        return "UMEM";        break;
-	}
+    case PMEM_TYPE_SLACK:       return "SLACK";       break;
+    case PMEM_TYPE_BLOCK:       return "BLOCK";       break;
+}
 	return "UNKNOWN";
 }
 
@@ -42,6 +44,23 @@ pmem_alloc_umem(size_t size, size_t alignment, struct pmem_region *rgn)
 
 	*rgn = result;
 	return 0;
+}
+
+void
+pmem_free_umem(struct pmem_region * rgn)
+{
+	if (!(rgn)                        || 
+	    !(rgn->type_is_set)           || 
+	    (rgn->type != PMEM_TYPE_UMEM) ||
+	    !(rgn->allocated_is_set)) {
+		return;
+	}
+	
+	rgn->allocated        = false;
+	
+	pmem_update(rgn);
+	
+	return;
 }
 
 bool

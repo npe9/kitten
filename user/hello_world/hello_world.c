@@ -21,6 +21,11 @@
 #include <sys/syscall.h>
 #include <lwk/task.h>
 #include <xpmem.h>
+#include <math.h>
+
+#define TEST_BLOCK_LAYER 1
+//#define TEST_TASK_MEAS 1
+
 static int pmem_api_test(void);
 static int aspace_api_test(void);
 static int task_api_test(void);
@@ -31,6 +36,12 @@ static int hypervisor_api_test(void);
 static int cow_api_test(void);
 static int tcasm_api_test(void);
 static int xpmem_api_test(void);
+#ifdef TEST_BLOCK_LAYER
+static int block_layer_test(void);
+#endif
+#ifdef TEST_TASK_MEAS
+static int task_meas_api_test(void);
+#endif
 
 int
 main(int argc, char *argv[], char *envp[])
@@ -55,6 +66,9 @@ main(int argc, char *argv[], char *envp[])
 	fd_test();
 	task_api_test();
 	task_migrate_test();
+#ifdef TEST_BLOCK_LAYER
+	block_layer_test();
+#endif
 	hypervisor_api_test();
         socket_api_test();
 	printf("\n");
@@ -63,7 +77,15 @@ main(int argc, char *argv[], char *envp[])
 	printf("\n");
 	printf("Spinning forever...\n");
 	for (i = 0; i < 10; i++) {
+#ifdef TEST_TASK_MEAS
+		{
+			volatile unsigned long long j;
+			for( j=0; j < (long long)1<<24; j++ );
+			task_meas_api_test();
+		}
+#else
 		sleep(5);
+#endif
 		printf("%s: Meow %d!\n", __func__, i );
 	}
 	printf("   That's all, folks!\n");
@@ -71,6 +93,14 @@ main(int argc, char *argv[], char *envp[])
 	while(1)
 		sleep(100000);
 }
+
+// Glibc doesn't provide a wrapper the Linux-specific gettid() call.
+static pid_t
+gettid(void)
+{
+	return syscall(__NR_gettid);
+}
+
 
 static int
 pmem_api_test(void)
@@ -127,31 +157,30 @@ xpmem_api_test(void)
   struct xpmem_addr addr;
 
   printf("TEST BEGIN: XPMEM API\n");
-  printf("buf address 0x%x\n",buf);
   for(i=0; i<8192; i++)
     buf[i]=i; 
-  seg = xpmem_make(&buf, 8192*sizeof(int), XPMEM_PERMIT_MODE, 0777);
-  if(seg == NULL){
+  seg = xpmem_make(&buf, 8192*sizeof(int), XPMEM_PERMIT_MODE, (void*)0777);
+  if(seg < 0){
   //if(status != 0){
     printf("ERROR: xpmem_make() status=%d\n", status);
     return -1;
   }
-  printf("made xpmem segment seg=%x\n", seg);
-  apid = xpmem_get(seg, XPMEM_RDWR, XPMEM_PERMIT_MODE, 0777);
-  if(apid == NULL){
+  printf("made xpmem segment seg=%lx\n", seg);
+  apid = xpmem_get(seg, XPMEM_RDWR, XPMEM_PERMIT_MODE, (void*)0777);
+  if(apid < 0){
     printf("ERROR: xpmem_get() status=%d\n", status);
     return -1;
   }
-  printf("got xpmem segment apid=%x\n", apid);
+  printf("got xpmem segment apid=%lx\n", apid);
   addr.apid = apid;
   addr.offset = 0;
   vaddr = xpmem_attach(addr, 8192*sizeof(int), NULL);
   
-  if(vaddr == -1) {
+  if(vaddr == NULL) {
     printf("ERROR: xpmem_attach() failed\n");
     return -1;
   }
-  printf("attached at vaddr 0x%x\n", vaddr);
+  printf("attached at vaddr 0x%p\n", vaddr);
   printf("vaddr 1 %d vaddr 2 %d vaddr 3 %d vaddr 4 %d\n", *((int*)vaddr),*((int*)vaddr+1), *((int*)vaddr+2),*((int*)vaddr+3));
   printf("TEST END: XPMEM API\n");
   return 0;
@@ -263,14 +292,6 @@ aspace_api_test(void)
 //	free(buf);
 	printf("TEST END:   Address Space Management\n");
 	return 0;
-}
-
-
-// Glibc doesn't provide a wrapper the Linux-specific gettid() call.
-static pid_t
-gettid(void)
-{
-	return syscall(__NR_gettid);
 }
 
 
@@ -402,7 +423,6 @@ task_api_test(void)
 	printf("TEST END:   Task Management\n");
 	return 0;
 }
-
 
 /* writen() is from "UNIX Network Programming" by W. Richard Stevents */
 static ssize_t
@@ -667,6 +687,53 @@ socket_api_test( void )
         return 0;
 }
 
+
+#ifdef TEST_BLOCK_LAYER
+
+char test_buf[4096];
+char hello_buf[512];
+char resp_buf[4096];
+
+int block_layer_test(void) {
+    int fd = 0;
+    int ret = 0;
+
+    printf("\nTEST BEGIN: Block Layer\n");
+
+    memset(test_buf, 0, 4096);
+    memset(hello_buf, 0, 512);
+    memset(resp_buf, 0, 4096);
+
+    sprintf(hello_buf, "Hello There\n");
+
+    fd = open("/dev/block/sata-0", O_RDWR);
+    printf("  Opened SATA-0\n");
+
+    ret = read(fd, test_buf, 4096);
+    printf("  Read %d bytes. Buf:\n", ret);
+    printf("  %s\n", test_buf);
+
+    lseek(fd, 100 * 4096, 0);
+
+    write(fd, hello_buf, 512);
+
+    read(fd, resp_buf, 512);
+    printf("  Resp1: %s\n", resp_buf);
+
+    lseek(fd, 100 * 4096, 0);
+
+    read(fd, resp_buf + 1024, 512);
+    printf("  Resp2: %s\n", resp_buf + 1024);
+
+    close(fd);
+
+    printf("TEST END: Block Layer\n");
+    return 0;
+}
+
+#endif
+
+
 /* These specify the virtual address start, end, and size
  * of the guest OS ISO image embedded in our ELF executable. */
 int _binary_hello_world_rawdata_size  __attribute__ ((weak));
@@ -723,14 +790,14 @@ tcasm_observer(void *v)
 	int i;
 	int status;
 	char *buf;
-	int offset;
+	long unsigned int offset;
 	double res;
 
-	offset = v;
+	offset = (long unsigned int)v;
 
 	aspace_get_myid(&my_id);
 	cur_id = shared_id;
-	printf("OBSERVER: hello world! offset %llx\n", offset);
+	printf("OBSERVER: hello world! offset %lx\n", offset);
 	// so this works, it needs to be able to get the values  it needs
 	for(;;) {
 		while(cur_id == shared_id)
@@ -820,14 +887,14 @@ tcasm_api_test(void)
 	}
 	printf("before stack\n");
 //	aspace_dump2console(id);
-	printf("rgn size %d %p %p %d\n", rgn.size, rgn.start, rgn.end, rgn.end - rgn.start);
+	printf("rgn size %ld 0x%lx 0x%lx %ld\n", rgn.size, rgn.start, rgn.end, rgn.end - rgn.start);
 	if((status = aspace_map_region_anywhere(id, &stack, rgn.end - rgn.start, VM_WRITE|VM_READ|VM_USER, VM_PAGE_2MB, "new-stack", rgn.start))) {
 		printf("couldn't map region %d\n", status);
 		return -1;
 	}
 	printf("after stack\n");
 //	aspace_dump2console(id);
-	printf("stack %x stack+VM_PAGE_2MB %x\n", stack, stack+VM_PAGE_2MB);
+	printf("stack 0x%lx stack+VM_PAGE_2MB 0x%lx\n", stack, stack+VM_PAGE_2MB);
 	s.fs = stack+VM_PAGE_2MB;
 	s.stack_ptr = stack+2*VM_PAGE_2MB;
 	// TODO: Get this working?
@@ -839,9 +906,9 @@ tcasm_api_test(void)
                 return -1;
                 // error handling.
         }
-	printf("backed rgn size %d %p %p %d\n", rgn.size, rgn.start, rgn.end, rgn.end - rgn.start);
+	printf("backed rgn size %ld 0x%lx 0x%lx %ld\n", rgn.size, rgn.start, rgn.end, rgn.end - rgn.start);
 //	pmem_dump2console();
-	printf("mapping npages 0x%lx pagesz 0x%lx npages*pagesz 0x%lx nbacking 0x%lx nbacking*pagesz 0x%lx (npages+nbacking)*pagesz 0x%lx\n", npages, pagesz, npages * pagesz, nbacking, nbacking*pagesz, (npages+nbacking)*pagesz);
+	printf("mapping npages 0x%x pagesz 0x%x npages*pagesz 0x%x nbacking 0x%x nbacking*pagesz 0x%x (npages+nbacking)*pagesz 0x%x\n", npages, pagesz, npages * pagesz, nbacking, nbacking*pagesz, (npages+nbacking)*pagesz);
 	status = arena_map_backed_region_anywhere(my_aspace, &region, npages*pagesz, nbacking*pagesz,
 			VM_USER, BK_ARENA, pagesz, "cow-region", rgn.start);
 	pmem_dump2console();
@@ -850,13 +917,13 @@ tcasm_api_test(void)
 		printf("couldn't create backed region %d\n", status);
 		return -1;
 	}
-	printf("region %p\n", region);
+	printf("region 0x%lx\n", region);
 //	aspace_dump2console(my_aspace);
 //	pmem_dump2console();
 	printf("  Begin Benchmark (time to touch %d %d byte pages):\n", npages, pagesz);
 	buf = (char*)region;
 //	buf = (char*)0x000000000b800000;
-	s.arg[0] = buf;
+	s.arg[0] = (uintptr_t)buf;
 	s.user_id = 1;
 	if((status = task_create(&s, &tid))) {
 		printf("couldn't create %d\n", status);
@@ -868,7 +935,7 @@ tcasm_api_test(void)
 		gettimeofday(&start, NULL);
 
 //		start = now();
-		printf("buf start 0x%lx end 0x%lx\n", buf, buf+len);
+		printf("buf start 0x%p end 0x%p\n", buf, buf+len);
 //		for(;;);
 		for(i = 0; i < ITERS; i++) {
 //			iter_start = now();
@@ -883,7 +950,7 @@ tcasm_api_test(void)
 			}
 			printf("finished\n");
 //			cp_start = now();
-			status = aspace_copy(MY_ID, &shared_id, 0);
+			status = aspace_copy(MY_ID, (id_t*)&shared_id, 0);
 //			cp_end = now();
 //			cps[i] = cp_end - cp_start;
 			if(status != 0) {
@@ -993,3 +1060,24 @@ cow_api_test(void)
 	printf("TEST END:   COW API\n");
 	return 0;
 }
+
+#ifdef TEST_TASK_MEAS
+static int
+task_meas_api_test(void)
+{
+	printf("TEST BEGIN: Task Measurement\n");
+
+	id_t aspace_id, task_id = gettid();
+	uint64_t time = 0, energy = 0, unit_energy = 0;
+
+	aspace_get_myid(&aspace_id);
+
+	task_meas(aspace_id, task_id, &time, &energy, &unit_energy);
+
+	printf("    aspace %d task %d ran for %g Seconds with total energy %g Joules and average power of %g Watts\n",
+		aspace_id, task_id, time / 10e9, energy * pow(0.5, unit_energy), energy * pow(0.5, unit_energy) / (time/10e9));
+
+	printf("TEST END:   Task Measurement\n");
+	return 0;
+}
+#endif

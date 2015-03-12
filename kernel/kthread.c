@@ -44,9 +44,6 @@ __kthread_create_on_cpu(
 	if ((tsk = __task_create(&state, NULL)) == NULL)
 		return NULL;
 
-	// Start the kernel thread executing on the target CPU's run queue
-	sched_add_task(tsk);
-
 	return tsk;
 }
 
@@ -95,6 +92,7 @@ kthread_create_on_cpu(
 
 	return __kthread_create_on_cpu(cpu_id, entry_point, arg, name);
 }
+
 
 int kthread_bind( struct task_struct* tsk, int cpu_id )
 {

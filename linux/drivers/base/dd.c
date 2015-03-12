@@ -23,7 +23,6 @@
 #include <linux/wait.h>
 
 #include "base.h"
-#include "power/power.h"
 
 
 static void driver_bound(struct device *dev)
@@ -105,7 +104,6 @@ static int really_probe(struct device *dev, struct device_driver *drv)
 	atomic_inc(&probe_count);
 	pr_debug("bus: '%s': %s: probing driver %s with device %s\n",
 		 drv->bus->name, __func__, drv->name, dev->bus_id);
-	WARN_ON(!list_empty(&dev->devres_head));
 
 	dev->driver = drv;
 	if (driver_sysfs_add(dev)) {
@@ -131,7 +129,6 @@ static int really_probe(struct device *dev, struct device_driver *drv)
 	goto done;
 
 probe_failed:
-	devres_release_all(dev);
 	driver_sysfs_remove(dev);
 	dev->driver = NULL;
 
@@ -306,7 +303,6 @@ static void __device_release_driver(struct device *dev)
 			dev->bus->remove(dev);
 		else if (drv->remove)
 			drv->remove(dev);
-		devres_release_all(dev);
 		dev->driver = NULL;
 		klist_remove(&dev->knode_driver);
 	}

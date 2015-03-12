@@ -14,7 +14,7 @@ print_pte(char *prefix, xpte_t *pte)
 	printk(KERN_DEBUG "%s %p a %d d %d g %d e %d o1 %d o2 %d pgsize %d pcd %d present %d pwt %d user %d write %d basepaddr 0x%lx\n",
 			prefix, pte, pte->accessed, pte->dirty, pte->global, pte->no_exec, pte->os_bits_1,
 			pte->os_bits_2, pte->pagesize, pte->pcd, pte->present, pte->pwt, pte->user,
-			pte->write, pte->base_paddr);
+			pte->write, (long unsigned int)pte->base_paddr);
 }
 void
 arch_aspace_pte_dump(
@@ -67,9 +67,9 @@ arch_aspace_pte_dump_qemu(
 	struct aspace *	aspace
 )
 {
-	unsigned int i, j, k, l;
+	long unsigned int i, j, k, l;
 	vaddr_t beg, end, cur;
-	paddr_t base;
+	//paddr_t base;
 	xpte_t *p;
 
 	xpte_t *pgd;	/* Page Global Directory: level 0 (root of tree) */
@@ -90,12 +90,12 @@ arch_aspace_pte_dump_qemu(
 		for (j = 0; j < 512; j++) {
 			if(pud[j].pagesize && pud[j].present) {
 				cur = (i << 39) + (j << 30);
-				if(cur != (end + (1<<30))){
-					printk(KERN_DEBUG "%.16x-%.16x %.16x %sr%s\n", beg, end + (1<<30), end-beg + (1<<30),
+				if(cur != (end + (1UL<<30))){
+					printk(KERN_DEBUG "%.16lx-%.16lx %.16lx %sr%s\n", beg, end + (1UL<<30), end-beg + (1UL<<30),
 							pud[j].user ? "u" : "-",
 							pud[j].write ? "w" : "-");
 					beg = end = cur;
-					base = p->base_paddr;
+					//base = p->base_paddr;
 				}else
 					end = cur;
 			}
@@ -107,12 +107,12 @@ arch_aspace_pte_dump_qemu(
 				if(pmd[k].pagesize && pmd[k].present) {
 					cur = (i << 39) + (j << 30) + (k << 21);
 					if(cur != (end + (1<<21))){
-						printk(KERN_DEBUG "%.16x-%.16x %.16x %sr%s\n", beg, end + (1<<21), end-beg + (1<<21),
+						printk(KERN_DEBUG "%.16lx-%.16lx %.16lx %sr%s\n", beg, end + (1UL<<21), end-beg + (1UL<<21),
 								pmd[k].user ? "u" : "-",
 
 								pmd[k].write ? "w" : "-");
 						beg = end = cur;
-						base = p->base_paddr;
+						//base = p->base_paddr;
 					}else
 						end = cur;
 				}
@@ -129,11 +129,11 @@ arch_aspace_pte_dump_qemu(
 						continue;
 					cur = (i << 39) + (j << 30) + (k << 21) + (l << 12);
 					if(cur != (end + (1<<12))){
-						printk(KERN_DEBUG "%.16x-%.16x %.16x %sr%s\n", beg, end+ (1<<12), end-beg+ (1<<12),
+						printk(KERN_DEBUG "%.16lx-%.16lx %.16lx %sr%s\n", beg, end+ (1<<12), end-beg+ (1<<12),
 								p->user ? "u" : "-",
 								p->write ? "w" : "-");
 						beg = end = cur;
-						base = p->base_paddr;
+						//base = p->base_paddr;
 					}else
 						end = cur;
 //					if(end != (i << 48) + (j << 32) + (k << 16) + i));
@@ -278,6 +278,7 @@ arch_aspace_copy(
 	target->arch.pgd = newpgd;
 //	printk(KERN_DEBUG "set newpgd\n");
 //	arch_aspace_pte_dump(target);
+	return 0;
 }
 
 
@@ -336,72 +337,6 @@ alloc_page_table(
  */
 static xpte_t *
 find_or_create_pte(
-	struct aspace *	aspace,
-	vaddr_t		vaddr,
-	vmpagesize_t	pagesz
-)
-{
-	xpte_t *pgd;	/* Page Global Directory: level 0 (root of tree) */
-	xpte_t *pud;	/* Page Upper Directory:  level 1 */
-	xpte_t *pmd;	/* Page Middle Directory: level 2 */
-	xpte_t *ptd;	/* Page Table Directory:  level 3 */
-
-	xpte_t *pge;	/* Page Global Directory Entry */
-	xpte_t *pue;	/* Page Upper Directory Entry */
-	xpte_t *pme;	/* Page Middle Directory Entry */
-	xpte_t *pte;	/* Page Table Directory Entry */
-//	printk(KERN_WARNING "finding vaddr %p\n", vaddr);
-	/* Calculate indices into above directories based on vaddr specified */
-	const unsigned int pgd_index = (vaddr >> 39) & 0x1FF;
-	const unsigned int pud_index = (vaddr >> 30) & 0x1FF;
-	const unsigned int pmd_index = (vaddr >> 21) & 0x1FF;
-	const unsigned int ptd_index = (vaddr >> 12) & 0x1FF;
-//	printk(KERN_WARNING "pgd_index %p pud_index %p pmd_index %p  ptd_index %p\n",
-//			pgd_index, pud_index, pmd_index, ptd_index);
-
-	/* Traverse the Page Global Directory */
-	pgd = aspace->arch.pgd;
-	pge = &pgd[pgd_index];
-	if (!pge->present && !alloc_page_table(pge))
-		return NULL;
-//	printk(KERN_WARNING "pge found\n");
-	/* Traverse the Page Upper Directory */
-	pud = __va(xpte_paddr(pge));
-	pue = &pud[pud_index];
-	if (pagesz == VM_PAGE_1GB)
-		return pue;
-	else if (!pue->present && !alloc_page_table(pue))
-		return NULL;
-	else if (pue->pagesize)
-		panic("BUG: Can't follow PUD entry, pagesize bit set.");
-//	printk(KERN_WARNING "pue found\n");
-	/* Traverse the Page Middle Directory */
-	pmd = __va(xpte_paddr(pue));
-	pme = &pmd[pmd_index];
-	if (pagesz == VM_PAGE_2MB)
-		return pme;
-	else if (!pme->present && !alloc_page_table(pme))
-		return NULL;
-	else if (pme->pagesize)
-		panic("BUG: Can't follow PMD entry, pagesize bit set.");
-//	printk(KERN_WARNING "pmd found\n");
-	/* Traverse the Page Table Entry Directory */
-	ptd = __va(xpte_paddr(pme));
-	pte = &ptd[ptd_index];
-//	printk(KERN_WARNING "pte accessed %x base_paddr %p dirty %x global %x no_exec %x os_bits_1 %x\n"
-//			"os_bits_2 %x pagesize %x pcd %x present %x pwt %x user %x write %x\n",
-//			pte->accessed, pte->base_paddr, pte->dirty, pte->global,
-//			pte->no_exec, pte->os_bits_1, pte->os_bits_2, pte->pagesize,
-//			pte->pcd, pte->present, pte->pwt, pte->user, pte->write);
-	return pte;
-}
-
-/**
- * Locates an existing page table entry or creates a new one if none exists.
- * Returns a pointer to the page table entry.
- */
-static xpte_t *
-copy_table(
 	struct aspace *	aspace,
 	vaddr_t		vaddr,
 	vmpagesize_t	pagesz
@@ -617,6 +552,11 @@ write_pte(
 		_pte.accessed = 1;
 		_pte.dirty    = 1;
 	}
+
+    if (flags & VM_NOCACHE) {
+        _pte.pcd      = 1;
+        _pte.pwt      = 1;
+    }
 
 	_pte.base_paddr = paddr >> 12;
 	if ((pagesz == VM_PAGE_2MB) || (pagesz == VM_PAGE_1GB))
@@ -840,8 +780,7 @@ arch_aspace_map_pmem_into_kernel(paddr_t start, paddr_t end)
 int
 do_page(struct aspace *aspace, vaddr_t addr, vmflags_t flags, vmpagesize_t pagesz)
 {
-	int i = 0;
-	xpte_t *pte, *newpte, *tmppte;
+	xpte_t *pte;
 	paddr_t paddr, newpaddr;
 
 //	printk(KERN_DEBUG "doing page addr %p flags %x pagesz %x\n", addr, flags, pagesz);
@@ -894,7 +833,7 @@ do_page(struct aspace *aspace, vaddr_t addr, vmflags_t flags, vmpagesize_t pages
 		asm volatile ( "invlpg %0" : : "m"(addr) : "memory" );
 		// so we've allocated the page, but what do we do to copy the page?
 
-		memcpy(addr, __va(paddr), pagesz);
+		memcpy((void*)addr, __va(paddr), pagesz);
 
 		// can store old ptes.
 		// is an intersection tree what I want here?
@@ -920,10 +859,3 @@ do_page(struct aspace *aspace, vaddr_t addr, vmflags_t flags, vmpagesize_t pages
 	return 0;
 }
 
-void
-func()
-{
-	// This function needs to change all of the found elements to be COW again.
-	// This is interesting, but this is a problem because of smart maps?
-	// no, not necessarily,
-}

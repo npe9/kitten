@@ -203,7 +203,7 @@ struct aspace_operations_struct arena_pops = {
 
 // must call with aspace locked
 int arena_init(struct aspace *aspace, paddr_t start, size_t extent) {
-	int i, status;
+	int status;
 	struct pmem_region	query;
 	struct pmem_region	*result;
 
@@ -219,14 +219,14 @@ int arena_init(struct aspace *aspace, paddr_t start, size_t extent) {
 	query.allocated		= false;
 	query.allocated_is_set	= false;
 
-	printk("mapping pmem looking for %p %p\n", start, start+extent);
+	printk("mapping pmem looking for 0x%lx 0x%lx\n", start, start+extent);
 //	pmem_dump2console();
 	status = pmem_query(&query, result);
 	if(status != 0) {
-		panic("couldn't find memory %d %p %p\n", status, result->start, result->end);
+		panic("couldn't find memory %d 0x%lx 0x%lx\n", status, result->start, result->end);
 	}
 	status = pmem_alloc_umem(extent, 0, result);
-	printk("mapping pmem want %p %p query %p %p result %p %p\n",
+	printk("mapping pmem want 0x%lx 0x%lx query 0x%lx 0x%lx result 0x%lx 0x%lx\n",
 			start, start+extent, query.start, query.end, result->start, result->end);
 	result->brk = result->start;
 	aspace->as_private_data = result;
@@ -300,7 +300,7 @@ register_arena(struct aspace *aspace, struct aspace *backing)
 	// and the regions are what make things work.
 //	aspace_virt_to_phys(aspace->id, aspace->)
 //	aspace->as_private_data;
-
+// need to use aspace virt to phys or something else to get my pmem.
 
 	if((pmem->end - pmem->start) < size) {
 		printk(KERN_ERR "attempting to allocate size %ld in region of size %ld",

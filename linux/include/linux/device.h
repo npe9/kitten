@@ -20,10 +20,8 @@
 #include <linux/compiler.h>
 #include <linux/types.h>
 #include <linux/module.h>
-#include <linux/pm.h>
 #include <linux/semaphore.h>
 #include <asm/atomic.h>
-#include <asm/device.h>
 
 #define BUS_ID_SIZE		20
 
@@ -55,17 +53,9 @@ struct bus_type {
 	struct driver_attribute	*drv_attrs;
 
 	int (*match)(struct device *dev, struct device_driver *drv);
-	int (*uevent)(struct device *dev, struct kobj_uevent_env *env);
 	int (*probe)(struct device *dev);
 	int (*remove)(struct device *dev);
 	void (*shutdown)(struct device *dev);
-
-	int (*suspend)(struct device *dev, pm_message_t state);
-	int (*suspend_late)(struct device *dev, pm_message_t state);
-	int (*resume_early)(struct device *dev);
-	int (*resume)(struct device *dev);
-
-	struct pm_ext_ops *pm;
 
 	struct bus_type_private *p;
 };
@@ -126,11 +116,8 @@ struct device_driver {
 	int (*probe) (struct device *dev);
 	int (*remove) (struct device *dev);
 	void (*shutdown) (struct device *dev);
-	int (*suspend) (struct device *dev, pm_message_t state);
-	int (*resume) (struct device *dev);
 	struct attribute_group **groups;
 
-	struct pm_ops *pm;
 
 	struct driver_private *p;
 };
@@ -187,15 +174,13 @@ struct class {
 	struct device_attribute		*dev_attrs;
 	struct kobject			*dev_kobj;
 
+
 	int (*dev_uevent)(struct device *dev, struct kobj_uevent_env *env);
+	int (*uevent)(struct device *dev, struct kobj_uevent_env *env);
 
 	void (*class_release)(struct class *class);
 	void (*dev_release)(struct device *dev);
 
-	int (*suspend)(struct device *dev, pm_message_t state);
-	int (*resume)(struct device *dev);
-
-	struct pm_ops *pm;
 	struct class_private *p;
 };
 
@@ -270,13 +255,8 @@ extern void class_destroy(struct class *cls);
 struct device_type {
 	const char *name;
 	struct attribute_group **groups;
-	int (*uevent)(struct device *dev, struct kobj_uevent_env *env);
 	void (*release)(struct device *dev);
 
-	int (*suspend)(struct device *dev, pm_message_t state);
-	int (*resume)(struct device *dev);
-
-	struct pm_ops *pm;
 };
 
 /* interface for exporting device attributes */
@@ -299,46 +279,8 @@ extern int __must_check device_create_bin_file(struct device *dev,
 					       struct bin_attribute *attr);
 extern void device_remove_bin_file(struct device *dev,
 				   struct bin_attribute *attr);
-extern int device_schedule_callback_owner(struct device *dev,
-		void (*func)(struct device *dev), struct module *owner);
 
-/* This is a macro to avoid include problems with THIS_MODULE */
-#define device_schedule_callback(dev, func)			\
-	device_schedule_callback_owner(dev, func, THIS_MODULE)
 
-/* device resource management */
-typedef void (*dr_release_t)(struct device *dev, void *res);
-typedef int (*dr_match_t)(struct device *dev, void *res, void *match_data);
-
-#ifdef CONFIG_DEBUG_DEVRES
-extern void *__devres_alloc(dr_release_t release, size_t size, gfp_t gfp,
-			     const char *name);
-#define devres_alloc(release, size, gfp) \
-	__devres_alloc(release, size, gfp, #release)
-#else
-extern void *devres_alloc(dr_release_t release, size_t size, gfp_t gfp);
-#endif
-extern void devres_free(void *res);
-extern void devres_add(struct device *dev, void *res);
-extern void *devres_find(struct device *dev, dr_release_t release,
-			 dr_match_t match, void *match_data);
-extern void *devres_get(struct device *dev, void *new_res,
-			dr_match_t match, void *match_data);
-extern void *devres_remove(struct device *dev, dr_release_t release,
-			   dr_match_t match, void *match_data);
-extern int devres_destroy(struct device *dev, dr_release_t release,
-			  dr_match_t match, void *match_data);
-
-/* devres group */
-extern void * __must_check devres_open_group(struct device *dev, void *id,
-					     gfp_t gfp);
-extern void devres_close_group(struct device *dev, void *id);
-extern void devres_remove_group(struct device *dev, void *id);
-extern int devres_release_group(struct device *dev, void *id);
-
-/* managed kzalloc/kfree for device drivers, no kmalloc, always use kzalloc */
-extern void *devm_kzalloc(struct device *dev, size_t size, gfp_t gfp);
-extern void devm_kfree(struct device *dev, void *p);
 
 struct device_dma_parameters {
 	/*
@@ -360,7 +302,7 @@ struct device {
 	char	bus_id[BUS_ID_SIZE];	/* position on parent bus */
 	const char		*init_name; /* initial name of the device */
 	struct device_type	*type;
-	unsigned		uevent_suppress:1;
+
 
 	struct semaphore	sem;	/* semaphore to synchronize calls to
 					 * its driver.
@@ -372,7 +314,6 @@ struct device {
 	void		*driver_data;	/* data private to the driver */
 	void		*platform_data;	/* Platform specific data, device
 					   core doesn't touch it */
-	struct dev_pm_info	power;
 
 #ifdef CONFIG_NUMA
 	int		numa_node;	/* NUMA node this device is close to */
@@ -390,11 +331,6 @@ struct device {
 
 	struct dma_coherent_mem	*dma_mem; /* internal for coherent mem
 					     override */
-	/* arch specific additions */
-	struct dev_archdata	archdata;
-
-	spinlock_t		devres_lock;
-	struct list_head	devres_head;
 
 	struct list_head	node;
 	struct class		*class;
@@ -404,8 +340,6 @@ struct device {
 	void	(*release)(struct device *dev);
 };
 
-/* Get the wakeup routines, which depend on struct device */
-#include <linux/pm_wakeup.h>
 
 static inline const char *dev_name(const struct device *dev)
 {
@@ -462,10 +396,8 @@ extern int __must_check device_add(struct device *dev);
 extern void device_del(struct device *dev);
 extern int device_for_each_child(struct device *dev, void *data,
 		     int (*fn)(struct device *dev, void *data));
-extern struct device *device_find_child(struct device *dev, void *data,
-				int (*match)(struct device *dev, void *data));
-extern int device_rename(struct device *dev, char *new_name);
-extern int device_move(struct device *dev, struct device *new_parent);
+
+
 
 /*
  * Manual binding of a device to driver. See drivers/base/bus.c

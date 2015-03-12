@@ -37,10 +37,6 @@ static void __devinit pcibios_fixup_peer_bridges(void)
 
 static int __init pci_legacy_init(void)
 {
-	if (!raw_pci_ops) {
-		printk(KERN_INFO "PCI: System does not support PCI\n");
-		return 0;
-	}
 
 	if (pcibios_scanned++)
 		return 0;
@@ -56,16 +52,7 @@ static int __init pci_legacy_init(void)
 
 int __init pci_subsys_init(void)
 {
-#ifdef CONFIG_X86_NUMAQ
-	pci_numaq_init();
-#endif
-#ifdef CONFIG_ACPI
-    //panic("%s()\n",__func__);
-	//pci_acpi_init();
-#endif
-#ifdef CONFIG_X86_VISWS
-	pci_visws_init();
-#endif
+
 	pci_legacy_init();
 	pcibios_irq_init();
 	pcibios_init();

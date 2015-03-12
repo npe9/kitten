@@ -7,6 +7,7 @@
 #include <lwk/params.h>
 #include <lwk/console.h>
 #include <lwk/netdev.h>
+#include <lwk/blkdev.h>
 #include <lwk/cpuinfo.h>
 #include <lwk/percpu.h>
 #include <lwk/smp.h>
@@ -111,16 +112,14 @@ start_kernel()
  	 */
 	aspace_subsys_init();
 
-	/*
- 	 * Initialize the task scheduling subsystem.
- 	 */
-	sched_subsys_init();
+
+	sched_init_runqueue(0); /* This CPUs scheduler state + idle task */
 	sched_add_task(current);  /* now safe to call schedule() */
 
 	/*
  	 * Initialize the task scheduling subsystem.
  	 */
-	timer_subsys_init();
+	core_timer_init(0);
 
 	/* Start the kernel filesystems */
 	kfs_init();
@@ -169,10 +168,22 @@ start_kernel()
 
 #ifdef CONFIG_NETWORK
 	/*
-	* Bring up any network devices.
-	*/
+	 * Bring up any network devices.
+	 */
 	netdev_init();
 #endif
+
+#ifdef CONFIG_CRAY_GEMINI
+	driver_init_list("net", "gemini");
+#endif
+
+#ifdef CONFIG_BLOCK_DEVICE
+	/**
+	 * Initialize the block devices
+	 */
+	blkdev_init();
+#endif
+
 
 	mcheck_init_late();
 
