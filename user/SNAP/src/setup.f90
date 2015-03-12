@@ -87,7 +87,6 @@ MODULE setup_module
 !
 !   Allocate needed arrays
 !_______________________________________________________________________
-
     CALL setup_alloc ( flg, ierr, error )
     IF ( ierr /= 0 ) THEN
       CALL print_error ( ounit, error )
@@ -161,14 +160,18 @@ MODULE setup_module
     flg = 0
     ierr = 0
     error = ' '
-
+    write (*,*) "allocate"
     CALL sn_allocate ( ndimen, ierr )
+    write (*,*) "glmax"
     CALL glmax ( ierr, comm_snap )
     IF ( ierr /= 0 ) THEN
       error = '***ERROR: SETUP_ALLOC: Allocation error in SN_ALLOCATE'
       RETURN
     END IF
-
+    write (*,*) "setup1"
+    CALL setup1(nx, ny, nz, ng)
+    write (*,*) "newproc"
+    CALL newproc
     CALL data_allocate ( nx, ny, nz, nmom, nang, noct, timedep, ierr )
     CALL glmax ( ierr, comm_snap )
     IF ( ierr /= 0 ) THEN
@@ -197,6 +200,7 @@ MODULE setup_module
     IF ( ndimen > 2 ) dz = lz / REAL( nz_gl, r_knd )
 
     IF ( timedep == 1 ) dt = tf / REAL( nsteps, r_knd )
+    CALL setup2(dx, dy, dz)
 !_______________________________________________________________________
 !_______________________________________________________________________
 

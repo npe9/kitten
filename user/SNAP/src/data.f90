@@ -12,6 +12,10 @@ MODULE data_module
 
   USE global_module, ONLY: i_knd, r_knd, zero
 
+  USE sn_module, ONLY: cmom
+
+  USE iso_c_binding
+
   IMPLICIT NONE
 
   PUBLIC
@@ -50,16 +54,19 @@ MODULE data_module
 
   INTEGER(i_knd) :: nmat=1
 
-  INTEGER(i_knd), ALLOCATABLE, DIMENSION(:,:,:) :: mat
+  INTEGER(i_knd), POINTER, DIMENSION(:,:,:) :: mat
 
-  REAL(r_knd), ALLOCATABLE, DIMENSION(:) :: v, vdelt
+  REAL(r_knd), POINTER, DIMENSION(:) :: v, vdelt
 
-  REAL(r_knd), ALLOCATABLE, DIMENSION(:,:) :: sigt, siga, sigs
+  REAL(r_knd), POINTER, DIMENSION(:,:) :: sigt, siga, sigs
 
-  REAL(r_knd), ALLOCATABLE, DIMENSION(:,:,:,:) :: qi, slgg
+  REAL(r_knd), POINTER, DIMENSION(:,:,:,:) :: qi, slgg
 
-  REAL(r_knd), ALLOCATABLE, DIMENSION(:,:,:,:,:,:) :: qim
+  REAL(r_knd), POINTER, DIMENSION(:,:,:,:,:,:) :: qim
+ 
+  INTEGER(c_size_t) array_size
 
+  type(c_ptr) :: cptr_in
 
   CONTAINS
 
@@ -89,8 +96,15 @@ MODULE data_module
 
     istat = 0
 
+    CALL CREATE_SHARED(noct, cmom, nmat)
+    
     IF ( timedep == 1 ) THEN
-      ALLOCATE( v(ng), STAT=istat )
+      array_size = ng
+      CALL ALLOCATE_ARRAY(array_size, cptr_in, 0)
+      ! so we are creating an apsace.
+      ! and we are sharing it.
+      !DO_SOMETHING ! allocate aspace here
+      CALL C_F_POINTER(cptr_in, v, [ng])
     ELSE
       ALLOCATE( v(0), STAT=istat )
     END IF
@@ -103,7 +117,10 @@ MODULE data_module
 !   2-D/3-D.
 !_______________________________________________________________________
 
-    ALLOCATE( mat(nx,ny,nz), STAT=istat )
+    array_size = nx*ny*nz
+    CALL ALLOCATE_ARRAY(array_size, cptr_in, 0)
+    CALL C_F_POINTER(cptr_in, mat, [nx,ny,nz])
+
     IF ( istat /= 0 ) RETURN
 
     mat = 1
@@ -116,12 +133,19 @@ MODULE data_module
 !_______________________________________________________________________
 
     IF ( src_opt < 3 ) THEN
-      ALLOCATE( qi(nx,ny,nz,ng), qim(0,0,0,0,0,0), STAT=istat )
+      array_size = nx*ny*nz*ng
+      CALL ALLOCATE_ARRAY(array_size, cptr_in, 0)
+      CALL C_F_POINTER(cptr_in, qi, [nx,ny,nz,ng])  
+      ALLOCATE(qim(0,0,0,0,0,0), STAT=istat )
       IF ( istat /= 0 ) RETURN
       qi = zero
     ELSE
-      ALLOCATE( qi(nx,ny,nz,ng), qim(nang,nx,ny,nz,noct,ng),           &
-        STAT=istat )
+      array_size = nx*ny*nz*ng
+      CALL ALLOCATE_ARRAY(array_size, cptr_in, 0)
+      CALL C_F_POINTER(cptr_in, qim, [nx,ny,nz,noct,ng])
+      array_size = nx*ny*nz*ng*noct
+      CALL share_init(array_size, cptr_in, 0)
+      CALL C_F_POINTER(cptr_in, qim, [nx,ny,nz,noct,ng])
       IF ( istat /= 0 ) RETURN
       qi = zero
       qim = zero
@@ -130,11 +154,8 @@ MODULE data_module
 !
 !   Allocate mock cross sections
 !_______________________________________________________________________
-
-    ALLOCATE( sigt(nmat,ng), siga(nmat,ng), sigs(nmat,ng),             &
-      slgg(nmat,nmom,ng,ng), STAT=istat )
-    IF ( istat /= 0 ) RETURN
-
+   ALLOCATE( sigt(nmat,ng), siga(nmat,ng), sigs(nmat,ng), slgg(nmat,nmom,ng,ng), STAT=istat ) 
+   IF ( istat /= 0 ) RETURN
     sigt = zero
     siga = zero
     sigs = zero

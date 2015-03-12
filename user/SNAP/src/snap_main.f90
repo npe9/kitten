@@ -104,6 +104,7 @@ PROGRAM snap_main
   error = ' '
 
   CALL pinit ( t1 )
+  CALL share_init( iproc )
 
   CALL wtime ( t2 )
   tparset = tparset + t2 - t1
@@ -119,7 +120,6 @@ PROGRAM snap_main
     CALL print_error ( 0, error )
     CALL stop_run ( 0, 0, 0 )
   END IF
-  CALL newproc()
 ! so how do we change this?
 ! can do I have to do it this way?
 ! wait, is it dong some magic with mpi?
@@ -158,9 +158,10 @@ PROGRAM snap_main
    CALL read_input
   END IF
 
-  WRITE (*,*) "closing input"
+  WRITE (*,*) "close file"
   CALL close_file ( iunit, ierr, error )
-  WRITE (*,*) "closed output"
+  
+  WRITE (*,*) "bcast"
   CALL bcast ( ierr, comm_snap, root )
   IF ( ierr /= 0 ) THEN
     CALL print_error ( ounit, error )
@@ -172,6 +173,7 @@ PROGRAM snap_main
 ! if necessary. Don't stop run. Set up the SDD MPI topology.
 !_______________________________________________________________________
 
+  WRITE (*,*) "wtime"
   CALL wtime ( t3 )
 
   CALL pinit_omp ( ierr, error )
@@ -179,14 +181,17 @@ PROGRAM snap_main
 
   CALL pcomm_set
 
+  WRITE (*,*) "pcomm_set"
   CALL wtime ( t4 )
   tparset = tparset + t4 - t3
 !_______________________________________________________________________
 !
 ! Setup problem
 !_______________________________________________________________________
-
+  write (*,*) "setting up" 
   CALL setup
+  
+  WRITE (*,*) "set up"
 !_______________________________________________________________________
 !
 ! Call for the problem solution

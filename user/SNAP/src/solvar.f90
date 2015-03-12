@@ -21,6 +21,8 @@ MODULE solvar_module
   USE data_module, ONLY: ng
 
   USE control_module, ONLY: timedep
+  
+  USE iso_c_binding
 
   IMPLICIT NONE
 
@@ -61,15 +63,20 @@ MODULE solvar_module
 !
 !_______________________________________________________________________
 
-  REAL(r_knd), ALLOCATABLE, DIMENSION(:,:,:,:) :: flux, fluxpo, fluxpi,&
+  REAL(r_knd), ALLOCATABLE, DIMENSION(:,:,:,:) :: fluxpo, fluxpi,&
     t_xs, a_xs, psii, psij, psik, jb_in, jb_out, kb_in, kb_out, flkx,  &
     flky, flkz
+
+  REAL(r_knd), POINTER, DIMENSION(:,:,:,:) :: flux
 
   REAL(r_knd), ALLOCATABLE, DIMENSION(:,:,:,:,:) :: qtot, q2grp, fluxm,&
     s_xs
 
   REAL(r_knd), DIMENSION(:,:,:,:,:,:), POINTER :: ptr_in, ptr_out
 
+  INTEGER(c_size_t) :: array_size
+
+  type(c_ptr) :: cptr_in
 
   CONTAINS
 
@@ -108,7 +115,11 @@ MODULE solvar_module
 !   Allocate the flux moments arrays. Keep an old copy.
 !_______________________________________________________________________
 
-    ALLOCATE( flux(nx,ny,nz,ng), fluxpo(nx,ny,nz,ng),                  &
+    array_size = nx*ny*nz*ng
+    CALL allocate_array(array_size, cptr_in)
+    CALL C_F_POINTER(cptr_in, flux, [nx,ny,nz,ng])
+
+    ALLOCATE( fluxpo(nx,ny,nz,ng),                  &
       fluxpi(nx,ny,nz,ng), fluxm(cmom-1,nx,ny,nz,ng), STAT=ierr )
     IF ( ierr /= 0 ) RETURN
 
@@ -192,12 +203,13 @@ MODULE solvar_module
 !_______________________________________________________________________
 
     DEALLOCATE( ptr_in, ptr_out )
-    DEALLOCATE( flux, fluxpo, fluxpi, fluxm )
+    DEALLOCATE( fluxpo, fluxpi, fluxm )
     DEALLOCATE( q2grp, qtot )
     DEALLOCATE( t_xs, a_xs, s_xs )
     DEALLOCATE( psii, psij, psik )
     DEALLOCATE( jb_in, jb_out, kb_in, kb_out )
     DEALLOCATE( flkx, flky, flkz )
+    CALL deallocate_shared
 !_______________________________________________________________________
 !_______________________________________________________________________
 

@@ -11,7 +11,7 @@ System.map
 *.swp
 .config
 .config.old
-.kconfig.d
+#.kconfig.d
 .version
 .kernelrelease
 patch
@@ -56,7 +56,7 @@ docs/latex/*
 *.orig
 *.rej
 CVS
-
+*.mod
 
 syntax: regexp
 include/config

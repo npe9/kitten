@@ -34,6 +34,8 @@ SUBROUTINE translv
 
   USE time_module, ONLY: tslv, wtime, tgrind, tparam
 
+  USE ISO_C_BINDING
+
   IMPLICIT NONE
 !_______________________________________________________________________
 !
@@ -204,6 +206,10 @@ SUBROUTINE translv
       cy_iits = cy_iits + out_iits
 
       IF ( iproc == root ) WRITE( ounit, 205 ) otno, dfmxo, out_iits
+
+      ! XXX: kludge make this portable
+      ! why did I put this here?
+      !CALL aspace_copy(aspace_id)
 
       IF ( otrdone ) EXIT outer_loop
 

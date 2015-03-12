@@ -44,7 +44,7 @@ SUBROUTINE analyze(i)
   ALLOCATE( pop(ng), STAT=ierr)
   ALLOCATE( res(ng), STAT=ierr)  
 
-  CALL shm_allocate(cptr1, cptr2, cy, fin)
+  CALL allocate_array(cptr1, cptr2, cy, fin)
 
   loop: DO WHILE ( fin == 0)
      CALL C_F_POINTER(cptr1, flux, [nx,ny,nz,ng])
@@ -67,10 +67,10 @@ SUBROUTINE analyze(i)
            WRITE ( *,* ) pop(g)
         END DO
      END IF
-     CALL unlink_shm
-     CALL shm_allocate(cptr1, cptr2, cy, fin)
+     CALL deallocate_shared 
+     CALL allocate_array(cptr1, cptr2, cy, fin)
   END DO loop
-  CALL unlink_shm
+  CALL deallocate_shared
   CALL shm_close
   CALL MPI_FINALIZE ( ierr )
   CALL exit ( 0 )

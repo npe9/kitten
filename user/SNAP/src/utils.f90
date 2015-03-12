@@ -166,9 +166,7 @@ MODULE utils_module
 
     IF ( iproc /= root ) RETURN
 
-    WRITE (*,*) "closing ",funit,ierr
     CLOSE( UNIT=funit, IOSTAT=ierr )
-    WRITE (*,*) "closed ",funit,ierr
 
     IF ( ierr /= 0 ) THEN
       error = '***ERROR: CLOSE_FILE: Unable to close file, unit:'
