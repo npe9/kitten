@@ -1387,9 +1387,10 @@ user: FORCE
 # A simple user-space app for the LWK to launch at boot
 init_task: user FORCE
 	#@cp $O/user/hello_world/hello_world $O/init_task
-	@cp $O/user/SNAP/src/snapg $O/init_task
+	#@cp $O/user/SNAP/src/snapg $O/init_task
 #	@cp $O/user/sh/sh $O/init_task
 	#@cp $O/user/compbench/compbench $O/init_task
+	@cp $O/user/pisces/pisces $O/init_task
 PHONY += FORCE
 FORCE:
 

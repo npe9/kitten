@@ -176,13 +176,14 @@ void
 do_page_fault(struct pt_regs *regs, unsigned int vector)
 {
 	int ret;
+  unsigned long cr2 = 0;
 	/* Kernel space exception fixup check */
 	if (fixup_exception(regs))
 		return;
 	// instruction faults are bad.
 	if(regs->orig_rax & 0x10)
 		goto bad;
-	unsigned long cr2 = read_cr2();
+	cr2 = read_cr2();
 	//printk(KERN_DEBUG "exception cr2 0x%x vector 0x%x\n", cr2, regs->orig_rax);
 	//pmem_dump2console();
 	ret = handle_page_fault(cr2);

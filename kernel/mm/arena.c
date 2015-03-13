@@ -167,10 +167,11 @@ int
 arena_attach(struct pmem_region *backing, struct list_head *arena_list)
 {
 	struct pmem_region *arena;
-
+	struct arena_list_entry *e;
 	// you need the second to last value.
 	arena_list = backing->tail->prev;
-	arena = list_entry(arena_list, struct arena_list_entry, rgn);
+	e = list_entry(arena_list, struct arena_list_entry, link);
+	arena = &e->rgn;
 	arena->refcnt++;
 
 	return 0;
@@ -183,9 +184,11 @@ arena_attach(struct pmem_region *backing, struct list_head *arena_list)
 void
 arena_release(struct pmem_region *backing, struct list_head *arena_list)
 {
+	struct arena_list_entry *e;
 	struct pmem_region *arena;
 
-	arena = list_entry(arena_list, struct arena_list_entry, rgn);
+	e = list_entry(arena_list, struct arena_list_entry, link);
+	arena = &e->rgn;
 	arena->refcnt--;
 	if(arena->refcnt == 0) {
 		list_del(arena_list);
@@ -301,7 +304,9 @@ register_arena(struct aspace *aspace, struct aspace *backing)
 //	aspace_virt_to_phys(aspace->id, aspace->)
 //	aspace->as_private_data;
 // need to use aspace virt to phys or something else to get my pmem.
-
+// FIXME(npe): get this initializing correctly
+	pmem = NULL;
+	size = 0;
 	if((pmem->end - pmem->start) < size) {
 		printk(KERN_ERR "attempting to allocate size %ld in region of size %ld",
 				size, pmem->end - pmem->start);
@@ -320,7 +325,7 @@ register_arena(struct aspace *aspace, struct aspace *backing)
 		entry->rgn.end = i + size;
 		entry->rgn.size = size;
 		// XXX: do I need to do any more setup of the pmem here?
-		list_add_tail(&entry, pmem->list);
+		list_add_tail(&entry->link, pmem->list);
 
 	}
 	pmem->head = pmem->tail = pmem->list;
