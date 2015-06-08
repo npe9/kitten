@@ -460,17 +460,21 @@ paddr_t
 elf_dflt_alloc_pmem(size_t size, size_t alignment, uintptr_t arg)
 {
 	struct pmem_region result;
-
-	if (pmem_alloc_umem(size, alignment, &result))
+	print("elf_dflt_alloc_pmem: kitten: entering\n");
+	if (pmem_alloc_umem(size, alignment, &result)){
+		print("alloc umem failed\n");
 		return 0;
-
-	if (pmem_zero(&result))
+	}
+	if (pmem_zero(&result)){
+		print("couldn't zero\n");
 		return 0;
-
+	}
 	/* Mark the memory as being used by the init task */
 	result.type = PMEM_TYPE_INIT_TASK;
 	pmem_update(&result);
-	
+
+	print("return result.start %p\n", result.start);
+	print("elf_dflt_alloc_pmem: kitten: exiting\n");
 	return result.start;
 }
 

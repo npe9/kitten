@@ -1,0 +1,178 @@
+ SNAP: SN (Discrete Ordinates) Application Proxy
+ Version Number..  1.01 
+ Version Date..  03-25-2013
+ Ran on 10-22-2014 at time 15:58:29
+
+********************************************************************************
+
+          Input Echo - Values from input or default
+********************************************************************************
+
+  NML=invar
+     npey=     1
+     npez=     1
+     ichunk=     4
+     nthreads=     1
+     nnested=   0
+     ndimen=  3
+     nx=     4
+     ny=     4
+     nz=     4
+     lx=  1.0000E+00
+     ly=  1.0000E+00
+     lz=  1.0000E+00
+     nmom=   2
+     nang=    8
+     ng=    2
+     mat_opt=  0
+     src_opt=  0
+     scatp=  0
+     epsi=  1.0000E-04
+     iitm=   5
+     oitm=  100
+     timedep=  0
+     tf=  0.0000E+00
+     nsteps=     1
+     it_det=  0
+     fluxp=  0
+     fixup=  0
+
+********************************************************************************
+
+          Calculation Run-time Parameters Echo
+********************************************************************************
+
+  Geometry
+    ndimen = 3
+    nx =     4
+    ny =     4
+    nz =     4
+    lx =  1.0000E+00
+    ly =  1.0000E+00
+    lz =  1.0000E+00
+    dx =  2.5000E-01
+    dy =  2.5000E-01
+    dz =  2.5000E-01
+
+  Sn
+    nmom = 2
+    nang =    8
+    noct = 8
+
+    w =  1.5625E-02   ... uniform weights
+
+          mu              eta               xi
+     6.25000000E-02   9.37500000E-01   3.42326598E-01
+     1.87500000E-01   8.12500000E-01   5.51985054E-01
+     3.12500000E-01   6.87500000E-01   6.55505530E-01
+     4.37500000E-01   5.62500000E-01   7.01560760E-01
+     5.62500000E-01   4.37500000E-01   7.01560760E-01
+     6.87500000E-01   3.12500000E-01   6.55505530E-01
+     8.12500000E-01   1.87500000E-01   5.51985054E-01
+     9.37500000E-01   6.25000000E-02   3.42326598E-01
+
+  Material Map
+    mat_opt = 0   -->   nmat = 1
+    Base material (default for every cell) = 1
+
+  Source Map
+    src_opt = 0
+    Source strength per cell (where applied) = 1.0
+    Source map:
+        Starting cell: (     1,     1,     1 )
+        Ending cell:   (     4,     4,     4 )
+
+  Pseudo Cross Sections Data
+    ng =   2
+
+    Material 1
+    Group         Total         Absorption      Scattering
+       1       1.000000E+00    5.000000E-01    5.000000E-01
+       2       1.010000E+00    5.050000E-01    5.050000E-01
+
+  Solution Control Parameters
+    epsi =  1.0000E-04
+    iitm =   5
+    oitm =  100
+    timedep = 0
+    it_det = 0
+    fluxp = 0
+    fixup = 0
+
+
+  Parallelization Parameters
+    npey =     1
+    npez =     1
+    nthreads =    1
+
+          Thread Support Level
+           0 - MPI_THREAD_SINGLE
+          35 - MPI_THREAD_FUNNELED
+           0 - MPI_THREAD_SERIALIZED
+           0 - MPI_THREAD_MULTIPLE
+    thread_level =  0
+
+    .FALSE. nested threading
+      nnested =    0
+
+********************************************************************************
+
+          Iteration Monitor
+********************************************************************************
+  Outer
+    1    Dfmxo= 0.0000E+00    No. Inners=    2
+
+  No. Outers=   1    No. Inners=    2
+
+********************************************************************************
+
+          Calculation Final Scalar Flux Solution
+********************************************************************************
+
+ ***********************************
+  Group=   1   Z Mid-Plane=    3
+ ***********************************
+
+     y    x    1      x    2      x    3      x    4  
+     4  2.9109E-01  3.6750E-01  3.6750E-01  2.9109E-01
+     3  3.6750E-01  4.6590E-01  4.6590E-01  3.6750E-01
+     2  3.6750E-01  4.6590E-01  4.6590E-01  3.6750E-01
+     1  2.9109E-01  3.6750E-01  3.6750E-01  2.9109E-01
+
+********************************************************************************
+
+
+ ***********************************
+  Group=   2   Z Mid-Plane=    3
+ ***********************************
+
+     y    x    1      x    2      x    3      x    4  
+     4  2.9029E-01  3.6652E-01  3.6652E-01  2.9029E-01
+     3  3.6652E-01  4.6468E-01  4.6468E-01  3.6652E-01
+     2  3.6652E-01  4.6468E-01  4.6468E-01  3.6652E-01
+     1  2.9029E-01  3.6652E-01  3.6652E-01  2.9029E-01
+
+********************************************************************************
+
+          Timing Summary
+********************************************************************************
+
+  Code Section                          Time (seconds)
+ **************                        ****************
+    Parallel Setup                       3.0041E-05
+    Input                                1.3900E-04
+    Setup                                1.7118E-04
+    Solve                                9.1600E-04
+       Parameter Setup                   8.7738E-05
+       Outer Source                      9.0599E-06
+       Inner Iterations                  7.7295E-04
+          Inner Source                   1.2875E-05
+          Transport Sweeps               7.5102E-04
+          Inner Misc Ops                 9.0599E-06
+       Solution Misc Ops                 4.6253E-05
+    Output                               8.7976E-05
+  Total Execution time                   1.6360E-03
+
+  Grind Time (nanoseconds)         1.1182E+02
+
+********************************************************************************

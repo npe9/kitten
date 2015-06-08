@@ -92,11 +92,13 @@ __task_create(
 	struct task_struct *tsk;
 	int irqstate;
 
+
 	// Lookup the target address space
 	aspace = aspace_acquire(start_state->aspace_id);
-	if (!aspace)
+	if (!aspace) {
+		printk(KERN_DEBUG "no aspace\n");
 		return NULL;
-
+	}
 	// Begin critical section
 	spin_lock_irqsave(&aspace->lock, irqstate);
 
@@ -170,6 +172,7 @@ __task_create(
 	list_head_init(&tsk->rr.sched_link);
 	list_head_init(&tsk->sigpending.list);
 	
+
 	// Do architecture-specific initialization
 	if (arch_task_create(tsk, start_state, parent_regs))
 		goto fail_arch;

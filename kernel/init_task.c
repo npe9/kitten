@@ -69,7 +69,7 @@ create_init_task(void)
 		printk("No init_elf_image found.\n");
 		return -EINVAL;
 	}
-	
+	printk("init_argv_str %s\n", init_argv_str);
 	/* This initializes start_state aspace_id, entry_point, and stack_ptr */
 	status =
 	elf_load(

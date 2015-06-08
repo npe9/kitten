@@ -12,6 +12,7 @@
 #include <lwk/tlbflush.h>
 #include <lwk/waitq.h>
 #include <lwk/sched.h>
+#include <lwk/arena.h>
 
 /**
  * Hash table used to lookup address space structures by ID.
@@ -115,17 +116,21 @@ lookup_and_lock(id_t id)
 	struct aspace *aspace;
 
 	/* Lock the hash table, lookup aspace object by ID */
+
 	spin_lock(&htable_lock);
+
 	if ((aspace = htable_lookup(htable, &id)) == NULL) {
 		spin_unlock(&htable_lock);
 		return NULL;
 	}
+
 
 	/* Lock the identified aspace */
 	spin_lock(&aspace->lock);
 
 	/* Unlock the hash table, others may now use it */
 	spin_unlock(&htable_lock);
+
 
 	return aspace;
 }
@@ -146,13 +151,18 @@ lookup_and_lock_two(id_t a, id_t b,
 	}
 
 	/* Lock the hash table, lookup aspace objects by ID */
+
 	spin_lock(&htable_lock);
+
 	if ((*aspace_a = htable_lookup(htable, &a)) == NULL) {
+		printk(KERN_DEBUG "couldn't find aspace %d\n", a);
 		spin_unlock(&htable_lock);
 		return -ENOENT;
 	}
 
 	if ((*aspace_b = htable_lookup(htable, &b)) == NULL) {
+		printk(KERN_DEBUG "couldn't find aspace %d\n", b);
+
 		spin_unlock(&htable_lock);
 		return -ENOENT;
 	}
@@ -180,7 +190,7 @@ aspace_subsys_init(void)
 
 	/* Create a hash table that will be used for quick ID->aspace lookups */
 	htable = htable_create(
-			7,  /* 2^7 bins in the hash table */
+			9,  /* 2^7 bins in the hash table */
 			offsetof(struct aspace, id),
 			offsetof(struct aspace, ht_link),
 			htable_id_hash,
@@ -460,6 +470,7 @@ __aspace_find_hole(struct aspace *aspace,
 	struct region *rgn;
 	vaddr_t hole;
 
+//	printk(KERN_DEBUG "aspace %p extent %p %d", aspace, extent, is_power_of_2(alignment));
 	if (!aspace || !extent || !is_power_of_2(alignment))
 		return -EINVAL;
 
@@ -489,10 +500,14 @@ aspace_find_hole(id_t id,
 
 	local_irq_save(irqstate);
 	aspace = lookup_and_lock(id);
+
 	status = __aspace_find_hole(aspace, start_hint, extent, alignment,
 	                            start);
+//	printk(KERN_DEBUG "found %d *start %llx\n", status, *start);
+
 	if (aspace) spin_unlock(&aspace->lock);
 	local_irq_restore(irqstate);
+
 	return status;
 }
 
@@ -508,6 +523,7 @@ __aspace_add_region(struct aspace *aspace,
 	struct list_head *pos;
 	vaddr_t end = calc_end(start, extent);
 
+//	printk(KERN_DEBUG "aspace %p start %p\n", aspace, start);
 	if (!aspace || !start)
 		return -EINVAL;
 
@@ -542,6 +558,7 @@ __aspace_add_region(struct aspace *aspace,
 		return -EINVAL;
 	}
 
+//	printk(KERN_DEBUG "pagesz %x start %p (start & (pagesz-1)) %x end %x end & (pagesz-1) %x\n", pagesz, start, (start & (pagesz-1)), end, end & (pagesz-1));
 	/* Region must be aligned to at least the specified page size */
 	if ((start & (pagesz-1)) || ((end!=ULONG_MAX) && (end & (pagesz-1)))) {
 		printk(KERN_WARNING
@@ -555,6 +572,9 @@ __aspace_add_region(struct aspace *aspace,
 		if ((start < cur->end) && (end > cur->start)) {
 			printk(KERN_WARNING
 			       "Region overlaps with existing region.\n");
+//			aspace_dump2console(aspace->id);
+			printk(KERN_WARNING "%s conflicts with %s", aspace->name, cur->name);
+//			aspace_dump2console(cur->aspace->id);
 			return -ENOTUNIQ;
 		}
 	}
@@ -666,7 +686,6 @@ __aspace_map_pmem(struct aspace *aspace,
 	    (pmem_is_type(PMEM_TYPE_UMEM, pmem, extent) == false) &&
 	    (pmem_is_type(PMEM_TYPE_INIT_TASK, pmem, extent) == false))
 		return -EPERM;
-
 	while (extent) {
 		/* Find region covering the address */
 		rgn = find_region(aspace, start);
@@ -676,7 +695,6 @@ __aspace_map_pmem(struct aspace *aspace,
 				start);
 			return -EINVAL;
 		}
-
 		/* Can't map anything to kernel or SMARTMAP regions */
 		if ((rgn->flags & VM_KERNEL) || (rgn->flags & VM_SMARTMAP)) {
 			printk(KERN_WARNING
@@ -695,7 +713,7 @@ __aspace_map_pmem(struct aspace *aspace,
 
 		/* Map until full extent mapped or end of region is reached */
 		while (extent && (start < rgn->end)) {
-
+//			printk(KERN_WARNING " mapping page pmem 0x%lx\n", pmem);
 			status = 
 			arch_aspace_map_page(
 				aspace,
@@ -712,7 +730,6 @@ __aspace_map_pmem(struct aspace *aspace,
 			pmem   += rgn->pagesz;
 		}
 	}
-
 	return 0;
 }
 
@@ -722,7 +739,8 @@ aspace_map_pmem(id_t id, paddr_t pmem, vaddr_t start, size_t extent)
 	int status;
 	struct aspace *aspace;
 	unsigned long irqstate;
-
+	
+	printk(KERN_DEBUG "mapping pmem pmem %lx start %lx extent %lx\n", pmem, start, extent);
 	local_irq_save(irqstate);
 	aspace = lookup_and_lock(id);
 	status = __aspace_map_pmem(aspace, pmem, start, extent);
@@ -807,14 +825,18 @@ __aspace_smartmap(struct aspace *src, struct aspace *dst,
 	struct region *rgn;
 
 	/* Can only SMARTMAP a given aspace in once */
+	//printk(KERN_DEBUG "Can we map?\n");
 	if (find_smartmap_region(dst, src->id))
 		return -EINVAL;
 
+	//printk(KERN_DEBUG "start greater than end?");
 	if (start >= end)
 		return -EINVAL;
 
+	//printk(KERN_DEBUG "unaligned?");
 	if ((start & (SMARTMAP_ALIGN-1)) || (end & (SMARTMAP_ALIGN-1)))
 		return -EINVAL;
+	//printk(KERN_DEBUG "aligned");
 
 	snprintf(name, sizeof(name), "SMARTMAP-%u", (unsigned int)src->id);
 	if ((status = __aspace_add_region(dst, start, extent,
@@ -847,12 +869,15 @@ aspace_smartmap(id_t src, id_t dst, vaddr_t start, size_t extent)
 
 	local_irq_save(irqstate);
 
+	//printk(KERN_DEBUG "smartmapping\n");
 	if ((status = lookup_and_lock_two(src, dst, &src_spc, &dst_spc))) {
 		local_irq_restore(irqstate);
 		return status;
 	}
+	//printk(KERN_DEBUG "locked\n");
 
 	status = __aspace_smartmap(src_spc, dst_spc, start, extent);
+	//printk(KERN_DEBUG "smartmapped %d\n", status);
 
 	spin_unlock(&src_spc->lock);
 	if (src != dst)
@@ -1083,6 +1108,54 @@ end:
 	return status;
 }
 
+/*
+ * what do I need here? I need to be able to do an aspace with a certain amount of stuff.
+ *
+ */
+int
+aspace_map_pmem_backed(id_t id, paddr_t pmem, vaddr_t start, size_t extent, void *as_private_data, struct aspace_operations_struct *as_ops)
+{
+	int status;
+	struct aspace *aspace;
+	unsigned long irqstate;
+
+	local_irq_save(irqstate);
+	aspace = lookup_and_lock(id);
+	status = __aspace_map_pmem(aspace, pmem, start, extent);
+	// so we need a pmem backing region on the aspace.
+	// XXX: is status correct?
+	if(status < 0)
+		goto finish;
+	aspace->as_private_data = as_private_data;
+	aspace->as_ops = as_ops;
+
+	// I need to add the ops and the private to this too.
+finish:
+	if (aspace) spin_unlock(&aspace->lock);
+	local_irq_restore(irqstate);
+	return status;
+}
+
+int
+aspace_unmap_pmem_backed(id_t id, vaddr_t start, size_t extent, size_t cow_extent)
+{
+	int status;
+	struct aspace *aspace;
+	unsigned long irqstate;
+
+	local_irq_save(irqstate);
+	aspace = lookup_and_lock(id);
+	status = __aspace_unmap_pmem(aspace, start, extent);
+	// XXX: so how do you unmap the extra cow extent? This memory is not mapped to a vaddr.
+	// it's a pmem_region attached. You need to be able to unalloc it.
+	aspace->as_ops->free(aspace->as_private_data);
+	if (aspace) spin_unlock(&aspace->lock);
+	local_irq_restore(irqstate);
+	// NOTE: this means that we don't have to worry?
+	flush_tlb();
+	return status;
+}
+
 int
 aspace_dump2console(id_t id)
 {
@@ -1111,7 +1184,294 @@ aspace_dump2console(id_t id)
 		);
 	}
 
+	arch_aspace_pte_dump_qemu(aspace);
+
 	spin_unlock(&aspace->lock);
 	local_irq_restore(irqstate);
+	return 0;
+}
+
+int
+aspace_set_region(id_t id, vaddr_t vaddr, size_t extent, bkflags_t type)
+{
+	struct aspace *aspace;
+	unsigned long irqstate;
+	paddr_t paddr;
+	int status;
+
+	local_irq_save(irqstate);
+
+	if (id == MY_ID)
+	  id = current->aspace->id;
+	if ((aspace = lookup_and_lock(id)) == NULL) {
+		local_irq_restore(irqstate);
+		return -EINVAL;
+	}
+
+	switch(type) {
+	case BK_ARENA:
+		if((status = __aspace_virt_to_phys(aspace, vaddr, &paddr))) {
+			printk(KERN_WARNING "failed status: %d\n", status);
+			return status;
+		}
+		printk(KERN_DEBUG "mapping pmem vaddr %lx paddr %lx\n", vaddr, paddr);
+		// so what do I need? I need a particular region.
+{
+	static int times;
+		if(times)
+			BUG();
+		times++;
+}
+		if((status = arena_init(aspace, paddr, extent)))
+			return status;
+		// I need an init function.
+		// and the init funciton needs to be able to handle this.
+		// so what you need is to pass the aspace.
+		// XXX: where do I get the ops from?
+		// XXX: where do I get the private from?
+		break;
+	}
+//	printk(KERN_WARNING "%d", i++);
+
+	spin_unlock(&aspace->lock);
+	local_irq_restore(irqstate);
+//	printk(KERN_WARNING "%d", i++);
+
+	return 0;
+}
+
+int
+aspace_sync_region(id_t id, vaddr_t vaddr, size_t extent)
+{
+	struct aspace *aspace;
+	unsigned long irqstate;
+
+	local_irq_save(irqstate);
+
+	if ((aspace = lookup_and_lock(id)) == NULL) {
+		local_irq_restore(irqstate);
+		return -EINVAL;
+	}
+	// so what this does is it makes a new aspace.
+	// right.
+	// and it switches.
+	// need to do pte local stuff.
+	// like what? I need to copy the page table.
+	// I need to make all of my pages cow again.
+
+	spin_unlock(&aspace->lock);
+	local_irq_restore(irqstate);
+	return 0;
+}
+
+int
+__aspace_copy(struct aspace *src, struct aspace *dst, int flags)
+{
+	struct region *srgn, *drgn;
+
+//	printk(KERN_DEBUG "Copying aspace %d %d\n", src->id, dst->id);
+
+
+	// so what am I doing here?
+//	if ((rgn = find_smartmap_region(dst, src->id)) == NULL)
+//		return -EINVAL;
+//	extent = rgn->end - rgn->start;
+
+	/* Do architecture-specific SMARTMAP unmapping */
+//	BUG_ON(arch_aspace_unsmartmap(src, dst, rgn->start, extent));
+
+	/* Delete the SMARTMAP region and release our reference on the source */
+	// so I need to copy regions too right?
+//	BUG_ON(__aspace_del_region(dst, rgn->start, extent));
+//	--src->refcnt;
+	// how do we handle the ref count?
+	// does the smartmap need to have something created too?
+	// that is a good question, I need to work out these details.
+
+	// so I need to be able to copy these.
+	// how do I do this?
+	arch_aspace_copy(src, dst);
+
+//	arch_aspace_pte_dump_qemu(dst);
+//	printk(KERN_DEBUG "Copied aspace pte\n");
+
+	dst->as_ops = src->as_ops;
+	dst->as_private_data = src->as_private_data;
+
+
+
+	// share signal group? I need to look this up.
+	list_for_each_entry(srgn, &src->region_list, link) {
+		if ((drgn = kmem_alloc(sizeof(struct region))) == NULL)
+			return -ENOMEM;
+		drgn->aspace = dst;
+		drgn->flags = srgn->flags;
+		// TODO(npe): Turn regions into a magic number
+		strncpy(drgn->name, srgn->name, 16);
+		drgn->pagesz = srgn->pagesz;
+		drgn->smartmap = srgn->smartmap;
+		drgn->start = srgn->start;
+		drgn->end = srgn->end;
+		// so I need to allocate it.
+		// then I need to do the rest.
+		list_add_tail(&drgn->link, &dst->region_list);
+		// need to copy each region.
+	}
+
+
+	// wait queues
+	if(flags & 0x1) {
+
+	}
+	// copy wait queue
+	if(flags & 0x2) {
+
+	}
+	// new wait queue
+
+	// signal group.
+
+
+//	printk(KERN_DEBUG "finished copying\n");
+
+
+//	should I copy the child lists and the regions?
+
+	return 0;
+}
+
+int
+aspace_copy(id_t src, id_t *dst, int flags)
+{
+	int status;
+	struct aspace *src_spc, *dst_spc;
+	unsigned long irqstate;
+
+	if (src == MY_ID)
+		src = current->aspace->id;
+
+	local_irq_save(irqstate);
+	aspace_create(ANY_ID, "COPY", dst);
+//	printk(KERN_DEBUG "new aspace %d\n", *dst);
+
+	if ((status = lookup_and_lock_two(src, *dst, &src_spc, &dst_spc))) {
+		local_irq_restore(irqstate);
+		printk(KERN_DEBUG "couldn't lock %d\n", status);
+		return status;
+	}
+
+	// do I copy this?
+	// FIXME(npe) coming up with a naming scheme
+	status = __aspace_copy(src_spc, dst_spc, flags);
+
+	spin_unlock(&src_spc->lock);
+	if (src != *dst)
+		spin_unlock(&dst_spc->lock);
+
+	local_irq_restore(irqstate);
+	// XXX: Is this necessary?
+	flush_tlb();
+//	printk(KERN_DEBUG "made it through status %d\n", status);
+
+	return status;
+}
+
+
+int
+handle_page_fault(vaddr_t addr)
+{
+	struct aspace *aspace;
+	struct region *rgn;
+	unsigned long irqstate;
+	vmflags_t flags;
+	int ret;
+
+	local_irq_save(irqstate);
+	if ((aspace = lookup_and_lock(current->aspace->id)) == NULL) {
+		local_irq_restore(irqstate);
+		return -EINVAL;
+	}
+
+	rgn = find_region(aspace, addr);
+	if(rgn == NULL) {
+		ret = -EFAULT;
+		goto exit;
+	}
+	flags = rgn->flags;
+	ret = do_page(rgn->aspace, addr, flags, rgn->pagesz);
+exit:
+	spin_unlock(&aspace->lock);
+	local_irq_restore(irqstate);
+	return ret;
+}
+
+int
+aspace_enum(void **buf, size_t *len)
+{
+	struct aspace *a;
+	struct region *rgn;
+	spin_lock(&htable_lock);
+	int naspace, nregion;
+	char *p;
+	struct user_tree *t;
+	struct user_aspace *ua;
+	struct user_region *ur;
+
+	naspace = 0;
+	nregion = 0;
+	/* Dry run, find out how much space we're going to need */
+	struct htable_iter iter = htable_iter( htable );
+	while( (a = htable_next( &iter )) ){
+
+		spin_lock(&a->lock);
+		// so I need some way to dump it.
+		// that is a good question.
+		naspace++;
+		list_for_each_entry(rgn, &a->region_list, link) {
+			nregion++;
+		}
+
+		spin_unlock(&a->lock);
+
+	}
+	/* we know how many we have, now allocate and fill up the structure */
+
+	*len = naspace*sizeof(struct user_aspace) + nregion*sizeof(struct user_region);
+	*buf = p = kmem_alloc(*len);
+	if(*buf == NULL)
+		return -ENOMEM;
+	// XXX: error checking on kmem_alloc?
+	t = (struct user_tree*)p;
+	t->count = naspace;
+	p += sizeof(struct user_tree);
+	ua = (struct user_aspace*)p;
+	p += naspace*sizeof(struct user_aspace);
+	ur = (struct user_region*)p;
+	iter = htable_iter( htable );
+	while( (a = htable_next( &iter )) ){
+		spin_lock(&a->lock);
+
+		// XXX: error checking
+		ua->id = a->id;
+		strncpy(ua->name, a->name, 32);
+		ua->refcnt = a->refcnt;
+		ua++;
+		list_for_each_entry(rgn, &a->region_list, link) {
+				// XXX: error checking
+				ur->start = rgn->start;
+				ur->end = rgn->end;
+				strncpy(ur->name, rgn->name, 32);
+				ua->count++;
+				ur++;
+		}
+		spin_unlock(&a->lock);
+	}
+
+	/* Lock the identified aspace */
+
+
+	/* Unlock the hash table, others may now use it */
+	spin_unlock(&htable_lock);
+
 	return 0;
 }

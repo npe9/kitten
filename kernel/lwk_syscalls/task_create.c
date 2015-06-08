@@ -18,10 +18,11 @@ sys_task_create(
 	if (copy_from_user(&_start_state, start_state, sizeof(_start_state)))
 		return -EFAULT;
 
+	printk(KERN_DEBUG "looking at aspace\n");
 	if ((_start_state.aspace_id < UASPACE_MIN_ID) ||
 	    (_start_state.aspace_id > UASPACE_MAX_ID))
 		return -EINVAL;
-
+	printk(KERN_DEBUG "creating task\n");
 	if ((status = task_create(&_start_state, &_task_id)) != 0)
 		return status;
 

@@ -669,7 +669,7 @@ void kfs_init_stdio(struct task_struct *task)
 	/* TODO: should really do a kfs_open() once for each of the
 	   std fds ... and use appropriate flags and mode for each */
 
-	printk("kfs_init_stdio(): task_id=%d, user_id=%d\n", task->id, task->uid);
+//	printk("kfs_init_stdio(): task_id=%d, user_id=%d\n", task->id, task->uid);
 
 	dbg("\n");
 	struct file * console;

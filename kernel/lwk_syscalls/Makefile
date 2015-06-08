@@ -5,11 +5,13 @@ obj-y := \
 	pmem_alloc.o \
 	pmem_zero.o \
 	aspace_create.o \
+	aspace_copy.o \
 	aspace_destroy.o \
 	aspace_get_myid.o \
 	aspace_find_hole.o \
 	aspace_add_region.o \
 	aspace_del_region.o \
+	aspace_set_region.o \
 	aspace_map_pmem.o \
 	aspace_unmap_pmem.o \
 	aspace_smartmap.o \
@@ -20,6 +22,7 @@ obj-y := \
 	task_create.o \
 	task_switch_cpus.o \
 	elf_hwcap.o \
+	kernel_query.o \
 	phys_cpu_add.o \
 	phys_cpu_remove.o \
 	sched_yield_task_to.o \

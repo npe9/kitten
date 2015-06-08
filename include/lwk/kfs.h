@@ -21,6 +21,7 @@
 #endif
 
 #define dbg(fmt,args...)
+//#define dbg _KDBG
 
 struct iovec;
 struct kiocb;

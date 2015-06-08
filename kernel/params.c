@@ -21,7 +21,7 @@
 #include <lwk/params.h>
 #include <lwk/ctype.h>
 
-#if 0
+#if 1
 #define DEBUGP printk
 #else
 #define DEBUGP(fmt, a...)
@@ -348,6 +348,7 @@ int param_array_get(char *buffer, struct kernel_param *kp)
 int param_set_copystring(const char *val, struct kernel_param *kp)
 {
 	struct kparam_string *kps = kp->arg;
+	printk("param_set_copystring %s\n", val);
 
 	if (strlen(val)+1 > kps->maxlen) {
 		printk(KERN_ERR "%s: string doesn't fit in %u chars.\n",
@@ -361,6 +362,7 @@ int param_set_copystring(const char *val, struct kernel_param *kp)
 int param_get_string(char *buffer, struct kernel_param *kp)
 {
 	struct kparam_string *kps = kp->arg;
+	printk("param_get_string %s\n", buffer);
 	return strlcpy(buffer, kps->string, kps->maxlen);
 }
 

@@ -14,5 +14,7 @@
 #include <lwk/elf.h>
 #include <lwk/auxvec.h>
 #include <lwk/palacios.h>
+#include <lwk/arena.h>
+#include <lwk/kernel_query.h>
 
 #endif

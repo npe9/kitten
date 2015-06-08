@@ -15,6 +15,8 @@ typedef enum {
 	PMEM_TYPE_INIT_TASK   = 3,  /* memory used by the initial task */
 	PMEM_TYPE_KMEM        = 4,  /* memory managed by the kernel */
 	PMEM_TYPE_UMEM        = 5,  /* memory managed by user-space */
+	PMEM_TYPE_SLACK		  = 6,  /* memory for user space COW etc... */
+	PMEM_TYPE_BLOCK		  = 7,  /* overlay window for actual physical memory */
 } pmem_type_t;
 
 /**
@@ -23,6 +25,8 @@ typedef enum {
 struct pmem_region {
 	paddr_t         start;             /* region occupies: [start, end) */
 	paddr_t         end;
+	paddr_t			brk;			   /* current location, for physical allocators */
+	paddr_t			size;			   /* to allow circular pmem buffers, mod by the size */
 
 	bool            type_is_set;       /* type field is set? */
 	pmem_type_t     type;              /* physical memory type */
@@ -36,7 +40,16 @@ struct pmem_region {
 	bool            name_is_set;       /* name field is set? */
 	char            name[32];          /* human-readable name of region */
 
+	struct pmem_operations *p_op;
+	/* allow for pmem segmentation and suballocators */
+	struct list_head *list;
+	struct list_head *head;
+	struct list_head *tail;
+	int refcnt;
 };
+
+
+
 
 /**
  * Core physical memory management functions.

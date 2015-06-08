@@ -272,7 +272,7 @@ config BUILT_IN_GUEST_OS
 config GUEST_OS_ISOIMAGE_PATH
 	string "Path to guest OS image"
 	depends on BUILT_IN_GUEST_OS
-	default "../guest_os/linux_guest.img"
+	default "../../nvl/palacios/test/geekos_test_vm/build/noboot.img"
 	help
 	  Path to a guest image to link with the example user/hello_world
 	  init task.  The hello_world init task will use this image

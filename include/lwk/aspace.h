@@ -33,8 +33,10 @@
 #define VM_KERNEL		(1 << 7)
 #define VM_HEAP			(1 << 8)
 #define VM_SMARTMAP		(1 << 9)
+// XXX: is there any reason to make these match the linux side?
+#define VM_COW		(1 << 10)
 typedef unsigned long vmflags_t;
-
+typedef unsigned long bkflags_t;
 
 // Symbolic names for various page sizes.
 // Note that a given architecture will likely only support a subset of these.
@@ -42,6 +44,27 @@ typedef unsigned long vmflags_t;
 #define VM_PAGE_2MB		(1 << 21)
 #define VM_PAGE_1GB		(1 << 30)
 typedef unsigned long vmpagesize_t;
+
+// Structures shared between kernel and user-space.
+struct user_region {
+	vaddr_t start;
+	vaddr_t end;
+	char name[32];
+
+};
+
+struct user_aspace {
+	id_t id;
+	char name[32];
+	int refcnt;
+	int count;
+	struct user_region *regions;
+};
+
+struct user_tree {
+	int count;
+	struct user_aspace aspaces[];
+};
 
 
 typedef struct {
@@ -151,6 +174,24 @@ extern int aspace_dump2console(
 	id_t			id
 );
 
+extern int aspace_copy(
+  id_t src,
+  id_t *dest,
+  int flags
+);
+
+extern int aspace_set_region(
+  id_t id,
+  vaddr_t start,
+  size_t extent,
+  bkflags_t type
+);
+
+extern int aspace_sync_region(
+	id_t id,
+	vaddr_t start,
+	size_t extent
+);
 // End core address space management API
 
 
@@ -197,6 +238,12 @@ aspace_unmap_region(
 #include <lwk/signal.h>
 #include <lwk/waitq.h>
 #include <arch/aspace.h>
+
+
+struct aspace_operations_struct {
+	int (*new_page)(struct aspace *, vmpagesize_t, paddr_t*);
+	void (*free)(void*);
+};
 
 
 // Address space structure
@@ -262,8 +309,11 @@ struct aspace {
 
 	// Architecture specific address space data.
 	struct arch_aspace	arch;
-};
 
+	struct aspace_operations_struct *as_ops;
+	void *as_private_data;
+
+};
 
 // Begin kernel-only "unlocked" versions of the core aspace management API.
 // 
@@ -371,6 +421,11 @@ aspace_wait4_child_exit(
 	int *			exit_status
 );
 
+extern int
+handle_page_fault(
+  vaddr_t cr2
+);
+
 // End kernel-only address space management API
 
 
@@ -436,6 +491,30 @@ arch_aspace_map_pmem_into_kernel(
 	paddr_t			end
 );
 
+extern int
+arch_aspace_copy(
+		struct aspace *		src,
+		struct aspace *		dst
+);
+
+extern void
+arch_aspace_pte_dump_qemu(
+    struct aspace *  aspace 
+);
+
+extern int
+aspace_enum(
+		void **buf,
+		size_t *len
+);
+
+extern int
+do_page(
+  struct aspace *aspace,
+  vaddr_t addr,
+  vmflags_t flags,
+  vmpagesize_t pagesz
+);
 // End architecture specific address space functions
 
 

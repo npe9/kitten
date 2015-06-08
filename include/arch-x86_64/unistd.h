@@ -700,7 +700,6 @@ __SYSCALL(__NR_lwk_ifconfig, sys_lwk_ifconfig)
 #else
 __SYSCALL(__NR_lwk_ifconfig, syscall_not_implemented)
 #endif
-
 #define __NR_phys_cpu_add	525
 __SYSCALL(__NR_phys_cpu_add, sys_phys_cpu_add)
 #define __NR_phys_cpu_remove	526
@@ -725,5 +724,16 @@ __SYSCALL(__NR_sched_setparams_task, sys_sched_setparams_task)
 __SYSCALL(__NR_sched_setparams_task, syscall_not_implemented)
 #endif
 
+#define __NR_aspace_set_region       531
+__SYSCALL(__NR_aspace_set_region, sys_aspace_set_region)
 
-#endif /* _ARCH_X86_64_UNISTD_H */
+#define __NR_aspace_sync_region       532
+__SYSCALL(__NR_aspace_sync_region, sys_aspace_sync_region)
+
+#define __NR_aspace_copy      533
+__SYSCALL(__NR_aspace_copy, sys_aspace_copy)
+
+#define __NR_kernel_query      534
+__SYSCALL(__NR_kernel_query, sys_kernel_query)
+
+#endif // _ARCH_X86_64_UNISTD_H

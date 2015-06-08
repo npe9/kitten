@@ -503,6 +503,30 @@ schedule_timeout(ktime_t timeout)
 	return timer_sleep_until(when);
 }
 
+/* FIXME(npe)
+ * task_enum needs to know how to enumerate the new run queues.
+int
+task_enum(void *buf, int len)
+{
+	int i;
+	struct run_queue *runq = &per_cpu(run_queue, this_cpu);
+	struct task_struct *prev = current, *next = NULL, *task, *tmp;
+
+	local_irq_disable();
+	spin_lock(&runq->lock);
+	// XXX: do this for every cpu.
+	i = 0;
+	list_for_each_entry_safe(task, tmp, &runq->task_list.rr, sched_link) {
+		task->id;
+		task->cpu_id;
+		task->aspace->id;
+		i++;
+	}
+	spin_unlock(&runq->lock);
+	BUG_ON(irqs_enabled());
+  return 0;
+}
+*/
 void
 schedule_new_task_tail(struct task_struct *prev, struct task_struct *next)
 {

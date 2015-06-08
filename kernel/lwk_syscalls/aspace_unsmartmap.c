@@ -6,8 +6,8 @@ sys_aspace_unsmartmap(
 	id_t    dst
 )
 {
-	if (current->uid != 0)
-		return -EPERM;
+//	if (current->uid != 0)
+//		return -EPERM;
 
 	if ((src < UASPACE_MIN_ID) || (src > UASPACE_MAX_ID))
 		return -EINVAL;

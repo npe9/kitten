@@ -1,0 +1,2 @@
+plot "/tmp/5data.dat" using ($2/1000000):($4/10) title base with lines, "/tmp/5data.dat" using ($2/1000000):($7/10) title mmap with lines, "/tmp/5data.dat" using ($2/1000000):($10/10) title tcasm with lines, "/tmp/5data.dat" using ($2/1000000):($13/10) title file with lines, "/tmp/5data.dat" using ($2/1000000):($16/10) title func with lines; 
+
