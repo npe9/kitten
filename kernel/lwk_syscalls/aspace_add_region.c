@@ -13,8 +13,8 @@ sys_aspace_add_region(
 {
 	char _name[16];
 
-	if (current->uid != 0)
-		return -EPERM;
+//	if (current->uid != 0)
+//		return -EPERM;
 
 	if ((id < UASPACE_MIN_ID) || (id > UASPACE_MAX_ID))
 		return -EINVAL;

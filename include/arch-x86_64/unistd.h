@@ -736,4 +736,7 @@ __SYSCALL(__NR_aspace_copy, sys_aspace_copy)
 #define __NR_kernel_query      534
 __SYSCALL(__NR_kernel_query, sys_kernel_query)
 
+#define __NR_kernel_set      535
+__SYSCALL(__NR_kernel_set, sys_kernel_set)
+	
 #endif // _ARCH_X86_64_UNISTD_H

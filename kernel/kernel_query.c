@@ -1,4 +1,5 @@
 #include <lwk/task.h>
+#include <lwk/pmem.h>
 #include <lwk/aspace.h>
 #include <lwk/kernel_query.h>
 
@@ -40,4 +41,17 @@ kernel_query(int name,
 	printk(KERN_WARNING "finished\n");
 
 	return 0;
+}
+
+int
+kernel_set(int name,
+		void *newval,
+		size_t newlen)
+{
+    switch(name) {
+    case CTL_PMEM:
+	    printk(KERN_DEBUG "setting pmem flag %d\n", (int)newval);
+	    trace_pmem = (int)newval;
+    }
+    return 0;
 }

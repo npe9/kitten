@@ -31,18 +31,22 @@ int
 pmem_alloc_umem(size_t size, size_t alignment, struct pmem_region *rgn)
 {
 	struct pmem_region constraint, result;
-
 	/* Find and allocate a chunk of PMEM_TYPE_UMEM physical memory */
+	int status;
+	
+	print("pmem_alloc_umem: allocing\n");
 	pmem_region_unset_all(&constraint);
 	constraint.start     = 0;
 	constraint.end       = (paddr_t)(-1);
 	constraint.type      = PMEM_TYPE_UMEM; constraint.type_is_set = true;
 	constraint.allocated = false;          constraint.allocated_is_set = true;
-
-	if (pmem_alloc(size, alignment, &constraint, &result))
+	
+	if (status = pmem_alloc(size, alignment, &constraint, &result)){
+		print("pmem_alloc_umem: didn't alloc STATUS = %d\n", status);
 		return -ENOMEM;
-
+	}
 	*rgn = result;
+	print("pmem_alloc_umem: alloced\n");
 	return 0;
 }
 

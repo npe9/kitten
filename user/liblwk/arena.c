@@ -49,18 +49,18 @@ arena_map_backed_region_anywhere(
 	int status;
 
 retry:
-//printf("finding holes\n");
+	print("finding holes\n");
 
 	if ((status = aspace_find_hole(id, 0, extent + backing_extent, pagesz, start)))
 		goto fail;
-	printf("second hole *start %lx extent %lx backing %lx\n", *start, extent, backing_extent);
+	print("second hole *start %lx extent %lx backing %lx\n", *start, extent, backing_extent);
 	if ((status = aspace_add_region(id, *start, extent, flags | VM_COW, pagesz, name))) {
 		if (status == -ENOTUNIQ)
 			goto retry; /* we lost a race with someone */
 		goto fail;
 	}
 
-
+	print("adding region\n");
 	// XXX: change the backing region to have a name too.
 	if ((status = aspace_add_region(id, *start+extent, backing_extent, (VM_USER |VM_WRITE|VM_READ), pagesz, name))) {
 		if (status == -ENOTUNIQ)
@@ -69,15 +69,15 @@ retry:
 	}
 
 
-	printf("mapping pmem pmem %lx start %lx extent %lx backing %lx\n", pmem, *start, extent, backing_extent);
+	print("mapping pmem pmem %lx start %lx extent %lx backing %lx\n", pmem, *start, extent, backing_extent);
 	if ((status = aspace_map_pmem(id, pmem, *start, extent))){
-		printf("status %d", status);
+		print("status %d", status);
 		goto all_region_cleanup;
 	}
-	printf("mapping pmem 2 pmem+extent %lx *start+extent %lx\n", pmem+extent, *start+extent);
+	print("mapping pmem 2 pmem+extent %lx *start+extent %lx\n", pmem+extent, *start+extent);
 	if ((status = aspace_map_pmem(id, pmem+extent, *start+extent, backing_extent)))
 		goto first_pmem_cleanup;
-	printf("mapping pmem 3 *start+extent %lx backing_extent %lx\n", *start+extent, backing_extent);
+	print("mapping pmem 3 *start+extent %lx backing_extent %lx\n", *start+extent, backing_extent);
 	if((status = aspace_set_region(id, *start+extent, backing_extent, BK_ARENA)))
 		goto all_pmem_cleanup;
 

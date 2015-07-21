@@ -47,3 +47,20 @@ sys_kernel_query(
 	// TODO(npe): free the buf
 	return 0;
 }
+
+int
+sys_kernel_set(
+		int name,
+		void *newval,
+		size_t newlenp
+)
+{
+	int status;
+
+	printk(KERN_DEBUG "setting debug flag %d\n", name);
+	if((status  = kernel_set(name, newval, newlenp)) != 0) {
+		printk(KERN_DEBUG "kernel_set failed status %d\n", status);
+		return status;
+	}
+	return 0;
+}

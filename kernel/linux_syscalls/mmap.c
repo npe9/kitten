@@ -3,6 +3,7 @@
 #include <lwk/aspace.h>
 #include <arch/mman.h>
 #include <lwk/kfs.h>
+#include <arch-x86_64/show.h>
 
 long
 sys_mmap(
@@ -44,6 +45,7 @@ sys_mmap(
 		   or becoming negative (which wraps around to large addr) */
 		if ((mmap_brk <= as->brk) || (mmap_brk >= as->mmap_brk)) {
 			spin_unlock(&as->lock);
+			//arch_show_kstack();
 			printk("[%s] SYS_MMAP: ENOMEM (len=%lu, heap_brk=%lx, mmap_brk=%lx)\n",
 			       current->name, len, as->brk, as->mmap_brk);
 			return -ENOMEM;

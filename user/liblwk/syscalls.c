@@ -231,6 +231,7 @@ SYSCALL2(v3_start_guest, vaddr_t, size_t);
  */
 
 SYSCALL6(kernel_query, int, size_t, void **, size_t *, void *, size_t);
+SYSCALL3(kernel_set, int, void *, size_t);
 
 /*
  * Scheduling control system calls.

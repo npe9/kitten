@@ -9,6 +9,8 @@
 #include <lwk/aspace.h>
 #include <arch/uaccess.h>
 
+#include <arch/pisces/pisces_boot_params.h>
+
 static LIST_HEAD(pmem_list);
 static DEFINE_SPINLOCK(pmem_list_lock);
 
@@ -16,6 +18,8 @@ struct pmem_list_entry {
 	struct list_head	link;
 	struct pmem_region	rgn;
 };
+
+int trace_pmem = 0;
 
 static struct pmem_list_entry *
 alloc_pmem_list_entry(void)
@@ -347,28 +351,36 @@ __pmem_alloc(size_t size, size_t alignment,
 	int status;
 	struct pmem_region query;
 	struct pmem_region candidate;
+	extern struct pisces_boot_params *pisces_boot_params;
+	uint64_t *i = (uint64_t*)pisces_boot_params->init_dbg_buf;
 
+	printk(KERN_DEBUG "__pmem_alloc size %ld alignment %ld constraint %p result %p\n", size, alignment, constraint, result);
+	printk(KERN_DEBUG "size %ld\n", size);
 	if (size == 0)
 		return -EINVAL;
 
+	printk(KERN_DEBUG "alignment %ld is_power_of_2(alignment) %d\n", alignment, is_power_of_2(alignment));
 	if (alignment && !is_power_of_2(alignment))
 		return -EINVAL;
 
+	printk(KERN_DEBUG "region_is_sane(constraint) %d\n", region_is_sane(constraint));
 	if (!region_is_sane(constraint))
 		return -EINVAL;
 
+	printk(KERN_DEBUG "contraint->allocated_is_set %d constraint->allocated %d\n", constraint->allocated_is_set, constraint->allocated);
 	if (constraint->allocated_is_set && constraint->allocated)
 		return -EINVAL;
 
 	query = *constraint;
 
 	while ((status = __pmem_query(&query, &candidate)) == 0) {
+		printk(KERN_DEBUG "queried: alignment %ld\n", alignment);
 		if (alignment) {
 			candidate.start = round_up(candidate.start, alignment);
 			if (candidate.start >= candidate.end)
 				candidate.start = candidate.end;
 		}
-
+		printk(KERN_DEBUG "size %lx candidate.start %lx .end %lx difference %ld\n", size, candidate.start, candidate.end, (candidate.end - candidate.start) - size);
 		if ((candidate.end - candidate.start) >= size) {
 			candidate.end = candidate.start + size;
 			candidate.allocated_is_set = true;
@@ -377,13 +389,15 @@ __pmem_alloc(size_t size, size_t alignment,
 			BUG_ON(status);
 			if (result)
 				*result = candidate;
+			printk(KERN_DEBUG "__pmem_alloc: successful return\n");
 			return 0;
 		}
 
 		query.start = candidate.end;
 	}
-	BUG_ON(status != -ENOENT);
 
+	printk("not enough memory\n");
+	BUG_ON(status != -ENOENT);
 	return -ENOMEM;
 }
 
@@ -395,10 +409,15 @@ pmem_alloc(size_t size, size_t alignment,
 	int status;
 	unsigned long irqstate;
 
+	extern struct pisces_boot_params *pisces_boot_params;
+	uint64_t *i = (uint64_t*)pisces_boot_params->init_dbg_buf;
+
+	printk(KERN_DEBUG "pisces_boot_params %p init_dbg_buf %d\n", pisces_boot_params, *i);
+
 	spin_lock_irqsave(&pmem_list_lock, irqstate);
 	status = __pmem_alloc(size, alignment, constraint, result);
 	spin_unlock_irqrestore(&pmem_list_lock, irqstate);
-
+	
 	return status;
 }
 

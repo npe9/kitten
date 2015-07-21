@@ -470,7 +470,7 @@ __aspace_find_hole(struct aspace *aspace,
 	struct region *rgn;
 	vaddr_t hole;
 
-//	printk(KERN_DEBUG "aspace %p extent %p %d", aspace, extent, is_power_of_2(alignment));
+	printk(KERN_DEBUG "aspace %p extent %p %d", aspace, extent, is_power_of_2(alignment));
 	if (!aspace || !extent || !is_power_of_2(alignment))
 		return -EINVAL;
 
@@ -478,12 +478,13 @@ __aspace_find_hole(struct aspace *aspace,
 		start_hint = 1;
 
 	hole = round_up(start_hint, alignment);
+	printk(KERN_DEBUG "finding overlapping region\n");
 	while ((rgn = find_overlapping_region(aspace, hole, hole + extent))) {
 		if (rgn->end == ULONG_MAX)
 			return -ENOENT;
 		hole = round_up(rgn->end, alignment);
 	}
-	
+	printk(KERN_DEBUG "holy\n");	
 	if (start)
 		*start = hole;
 	return 0;
@@ -498,12 +499,13 @@ aspace_find_hole(id_t id,
 	struct aspace *aspace;
 	unsigned long irqstate;
 
+	printk(KERN_DEBUG "I bet I'm not going here!!!\n");
 	local_irq_save(irqstate);
 	aspace = lookup_and_lock(id);
-
+	printk(KERN_DEBUG "am I holy?\n");
 	status = __aspace_find_hole(aspace, start_hint, extent, alignment,
 	                            start);
-//	printk(KERN_DEBUG "found %d *start %llx\n", status, *start);
+	printk(KERN_DEBUG "found %d *start %llx\n", status, *start);
 
 	if (aspace) spin_unlock(&aspace->lock);
 	local_irq_restore(irqstate);
@@ -740,7 +742,7 @@ aspace_map_pmem(id_t id, paddr_t pmem, vaddr_t start, size_t extent)
 	struct aspace *aspace;
 	unsigned long irqstate;
 	
-	printk(KERN_DEBUG "mapping pmem pmem %lx start %lx extent %lx\n", pmem, start, extent);
+	//printk(KERN_DEBUG "mapping pmem pmem %lx start %lx extent %lx\n", pmem, start, extent);
 	local_irq_save(irqstate);
 	aspace = lookup_and_lock(id);
 	status = __aspace_map_pmem(aspace, pmem, start, extent);

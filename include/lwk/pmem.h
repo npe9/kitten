@@ -50,7 +50,7 @@ struct pmem_region {
 
 
 
-
+extern int trace_pmem;
 /**
  * Core physical memory management functions.
  */

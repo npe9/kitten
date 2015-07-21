@@ -451,30 +451,32 @@ elf_init_stack(
 	return 0;
 }
 
+int boomboom = 0;
 /**
  * A "default" alloc_pmem() function for use with elf_load_executable().
  * A user may wish to define a custom replacement alloc_pmem() function
  * to, for example, keep track of the physical memory that is allocated.
  */
+
 paddr_t
 elf_dflt_alloc_pmem(size_t size, size_t alignment, uintptr_t arg)
 {
 	struct pmem_region result;
-	print("elf_dflt_alloc_pmem: kitten: entering\n");
+
+	print("elf_dflt: pmem_alloc_umem size %ld alignment %lx result* %p\n", size, alignment, &result);
 	if (pmem_alloc_umem(size, alignment, &result)){
-		print("alloc umem failed\n");
 		return 0;
 	}
+	print("alloced umem\n");
 	if (pmem_zero(&result)){
-		print("couldn't zero\n");
 		return 0;
 	}
 	/* Mark the memory as being used by the init task */
+	print("updating pmem\n");
 	result.type = PMEM_TYPE_INIT_TASK;
 	pmem_update(&result);
 
-	print("return result.start %p\n", result.start);
-	print("elf_dflt_alloc_pmem: kitten: exiting\n");
+	print("elf_dflt_alloc_pmem: returning\n");
 	return result.start;
 }
 
@@ -731,6 +733,7 @@ elf_load(
 	uint32_t hwcap;
 	paddr_t elf_image_paddr;
 
+	print("elf_load: heap_size %ld stack_size %ld\n", heap_size, stack_size);
 	if (!elf_image || !start_state || !alloc_pmem)
 		return -EINVAL;
 
@@ -793,6 +796,7 @@ elf_load(
 	stack_end    = SMARTMAP_ALIGN;
 	stack_start  = round_down(stack_end - stack_size, pagesz);
 	stack_extent = stack_end - stack_start;
+	print("making stack start %lx end %lx extent %ld\n", stack_start, stack_end, stack_extent);
 	status = 
 	make_region(
 		aspace_id,
